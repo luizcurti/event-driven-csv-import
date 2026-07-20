@@ -1,0 +1,93 @@
+Project Specification
+
+# Project
+
+Name
+
+event-driven-data-ingestion
+
+Objective
+
+Build a serverless platform for large CSV imports using an event-driven architecture on AWS.
+
+The system should handle hundreds of thousands of rows and process them in a distributed and scalable way.
+
+Architecture
+
+Internet -> AWS WAF -> API Gateway -> Upload Lambda -> Amazon S3 -> EventBridge -> Step Functions -> Split Lambda -> SQS -> Worker Lambdas -> Aggregator Lambda -> DynamoDB -> CloudWatch
+
+Functional Flow
+
+1. The user uploads a CSV.
+2. The API responds immediately.
+3. The file is stored in S3.
+4. EventBridge receives an ObjectCreated event.
+5. Step Functions starts.
+6. The Split Lambda divides the file into chunks.
+7. Each chunk generates an SQS message.
+8. Workers process chunks in parallel.
+9. Each Worker stores partial results.
+10. The Aggregator checks when all chunks are done.
+11. It consolidates the result.
+12. It updates the import status.
+13. CloudWatch records metrics and logs.
+
+Technologies
+
+Node.js 22 LTS
+TypeScript
+AWS Lambda
+AWS API Gateway
+AWS S3
+AWS EventBridge
+AWS Step Functions
+Amazon SQS
+Amazon DynamoDB
+Amazon CloudWatch
+Terraform
+GitHub Actions
+Jest
+ESLint
+Prettier
+
+Implemented API
+
+- POST /imports
+- GET /imports
+- GET /imports/{id}
+
+Current Implementation Notes
+
+- The codebase is written in English.
+- The repository uses strict TypeScript.
+- The local test suite includes unit tests and an end-to-end LocalStack flow.
+- The main README and Terraform docs are written in English.
+- The current Postman collection matches the implemented routes.
+
+Quality Goals
+
+- 100% unit and end-to-end coverage.
+- Structured logging.
+- Shared models and contracts.
+- Clear separation between handlers, business rules, and infrastructure.
+- Configuration through environment variables.
+
+Terraform Structure
+
+root/
+terraform/
+modules/
+  lambda/
+  s3/
+  dynamodb/
+  sqs/
+  stepfunctions/
+  eventbridge/
+  iam/
+  cloudwatch/
+  apigateway/
+  waf/
+  alarms/
+environments/
+  dev/
+  prod/

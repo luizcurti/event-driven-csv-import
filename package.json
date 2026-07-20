@@ -1,0 +1,53 @@
+{
+	"name": "event-driven-data-ingestion",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=22"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
+		"lint": "eslint .",
+		"local:up": "bash ./scripts/local-up.sh",
+		"local:down": "bash ./scripts/local-down.sh",
+		"terraform:init": "bash ./scripts/terraform-init.sh",
+		"terraform:fmt": "bash ./scripts/terraform-fmt.sh",
+		"terraform:validate": "bash ./scripts/terraform-validate.sh",
+		"terraform:plan": "bash ./scripts/terraform-plan.sh",
+		"test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+		"test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/localstack.e2e.test.ts --runInBand",
+		"test:localstack": "LOCALSTACK_ENDPOINT=http://localhost:4566 node --experimental-vm-modules node_modules/jest/bin/jest.js tests/localstack.e2e.test.ts --runInBand",
+		"test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+		"test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+		"test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand",
+		"typecheck": "tsc --noEmit",
+		"verify": "npm run typecheck && npm run lint && npm run test:coverage"
+	},
+	"devDependencies": {
+		"@aws-sdk/client-dynamodb": "^3.859.0",
+		"@aws-sdk/client-s3": "^3.859.0",
+		"@aws-sdk/lib-dynamodb": "^3.859.0",
+		"@types/aws-lambda": "^8.10.150",
+		"@types/jest": "^30.0.0",
+		"@types/node": "^22.10.10",
+		"@typescript-eslint/eslint-plugin": "^8.24.1",
+		"@typescript-eslint/parser": "^8.24.1",
+		"eslint": "^9.20.1",
+		"eslint-config-prettier": "^10.0.1",
+		"jest": "^29.7.0",
+		"prettier": "^3.5.1",
+		"ts-jest": "^29.2.5",
+		"typescript": "^5.8.2"
+	},
+	"dependencies": {
+		"@aws-sdk/client-dynamodb": "^3.1090.0",
+		"@aws-sdk/client-eventbridge": "^3.1090.0",
+		"@aws-sdk/client-s3": "^3.1090.0",
+		"@aws-sdk/client-sfn": "^3.1090.0",
+		"@aws-sdk/client-sqs": "^3.1090.0",
+		"@aws-sdk/lib-dynamodb": "^3.1090.0"
+	}
+}

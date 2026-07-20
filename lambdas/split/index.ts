@@ -1,0 +1,1 @@
+export { createSplitHandler } from './handler.js';

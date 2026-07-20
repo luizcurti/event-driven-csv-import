@@ -1,0 +1,1 @@
+export { createAggregatorHandler } from './handler.js';

@@ -1,0 +1,9 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "terraform": true,
+        "/^python - <<'PY'\nfrom pathlib import Path\ntext = Path\\('coverage/lcov\\.info'\\)\\.read_text\\(\\)\nfor needle in \\['lambdas/upload/handler\\.ts', 'shared/object-storage\\.ts', 'shared/s3-object-storage\\.ts', 'shared/dynamodb-import-store\\.ts'\\]:\n    print\\('FILE', needle\\)\n    start = text\\.find\\(f'SF:\\{needle\\}'\\)\n    end = text\\.find\\('end_of_record', start\\)\n    for line in text\\[start:end\\]\\.splitlines\\(\\):\n        if line\\.startswith\\('BRDA:'\\):\n            print\\(line\\)\n    print\\('---'\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
