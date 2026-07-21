@@ -134,6 +134,12 @@ describe('handler coverage', () => {
     ).rejects.toThrow('Upload payload must be multipart/form-data or a valid JSON envelope.');
     await expect(handler(event('', { 'content-type': 'multipart/form-data' }))).rejects.toThrow('Multipart boundary is missing.');
     await expect(
+      handler(event(undefined as unknown as string, { 'content-type': 'application/json' })),
+    ).rejects.toThrow('Upload payload must be multipart/form-data or a valid JSON envelope.');
+    await expect(
+      handler(event(undefined as unknown as string, { 'content-type': 'application/json' }, true)),
+    ).rejects.toThrow('Upload payload must be multipart/form-data or a valid JSON envelope.');
+    await expect(
       handler(
         event(
           ['--boundary', 'Content-Disposition: form-data; name="other"', '', 'payload', '--boundary--'].join('\r\n'),

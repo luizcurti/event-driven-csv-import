@@ -66,6 +66,10 @@ describe('adapter coverage', () => {
           return { Body: Readable.from([Buffer.from('stream-body')]) };
         }
 
+        if (key === 'string-stream.csv') {
+          return { Body: Readable.from(['string-stream-body']) };
+        }
+
         if (key === 'empty.csv') {
           return { Body: undefined };
         }
@@ -91,10 +95,12 @@ describe('adapter coverage', () => {
     expect(await storage.getObject('bucket-a', 'string.csv')).toMatchObject({ body: 'string-body' });
     expect(await storage.getObject('bucket-a', 'bytes.csv')).toMatchObject({ body: 'bytes-body' });
     expect(await storage.getObject('bucket-a', 'stream.csv')).toMatchObject({ body: 'stream-body', contentType: 'application/octet-stream' });
+    expect(await storage.getObject('bucket-a', 'string-stream.csv')).toMatchObject({ body: 'string-stream-body', contentType: 'application/octet-stream' });
     expect(await storage.getObject('bucket-a', 'empty.csv')).toBeUndefined();
     expect(await storage.getObject('bucket-a', 'invalid.csv')).toBeUndefined();
     await storage.moveObject('bucket-a', 'string.csv', 'bucket-a', 'moved.csv');
     await storage.moveObject('bucket-a', 'bytes.csv', 'bucket-b', 'copied.csv');
+    await storage.moveObject('bucket-a', 'missing.csv', 'bucket-b', 'missing-copy.csv');
     expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([expect.objectContaining({ key: 'processed/file.csv' })]);
     expect(await storage.listObjects('bucket-a', 'missing/')).toEqual([]);
     expect(createBucketObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');
@@ -240,18 +246,11 @@ describe('adapter coverage', () => {
       }
 
       if (name === 'ScanCommand') {
-        return { Items: [] };
+        return { Items: undefined };
       }
 
       if (name === 'QueryCommand') {
-        return {
-          Items: [
-            {
-              pk: 'IMPORT#import-9',
-              sk: 'CHUNK#000001',
-            },
-          ],
-        };
+        return { Items: undefined };
       }
 
       if (name === 'PutCommand') {
@@ -274,14 +273,57 @@ describe('adapter coverage', () => {
       chunkSize: 0,
     });
     expect(await store.listImports()).toEqual([]);
-    expect(await store.listChunkResults('import-9')).toEqual([
+    expect(await store.listChunkResults('import-9')).toEqual([]);
+  });
+
+  it('covers DynamoDB empty arrays explicitly', async () => {
+    const send = jest.fn(async (command: unknown) => {
+      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+
+      if (name === 'ScanCommand') {
+        return { Items: [] };
+      }
+
+      if (name === 'QueryCommand') {
+        return { Items: [] };
+      }
+
+      return {};
+    });
+
+    const store = new DynamoDbImportStore({ send } as never, 'imports-table');
+
+    expect(await store.listImports()).toEqual([]);
+    expect(await store.listChunkResults('import-9')).toEqual([]);
+  });
+
+  it('covers DynamoDB chunk fallbacks', async () => {
+    const send = jest.fn(async (command: unknown) => {
+      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+
+      if (name === 'QueryCommand') {
+        return {
+          Items: [
+            {
+            },
+          ],
+        };
+      }
+
+      return {};
+    });
+
+    const store = new DynamoDbImportStore({ send } as never, 'imports-table');
+
+    expect(await store.listChunkResults('import-10')).toEqual([
       expect.objectContaining({
-        importId: 'import-9',
+        importId: '',
         chunkNumber: 0,
         workerId: '',
         requestId: '',
         errors: [],
         durationMs: 0,
+        correlationId: '',
       }),
     ]);
   });

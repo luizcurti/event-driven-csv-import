@@ -274,6 +274,7 @@ describe('shared coverage', () => {
       metadata: { importId: 'import-1' },
     });
     expect(await storage.listObjects('bucket-a', 'processed/')).toHaveLength(1);
+    expect(await storage.listObjects('bucket-a', undefined)).toHaveLength(1);
     await storage.putObject({
       bucket: 'bucket-a',
       key: 'incoming/plain.csv',
