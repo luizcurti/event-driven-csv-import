@@ -1,17 +1,7 @@
 import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { CreateBucketCommand, HeadBucketCommand, type S3Client as AwsS3Client } from '@aws-sdk/client-s3';
-import {
-  CreateEventBusCommand,
-  DescribeEventBusCommand,
-  type EventBridgeClient,
-} from '@aws-sdk/client-eventbridge';
-import {
-  CreateStateMachineCommand,
-  ListStateMachinesCommand,
-  type SFNClient,
-} from '@aws-sdk/client-sfn';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { type S3Client as AwsS3Client } from '@aws-sdk/client-s3';
 import { createAwsClients } from '../shared/aws-clients.js';
 import { loadConfig } from '../shared/config.js';
 import { createDependencies, createAwsDependencies } from '../shared/dependencies.js';

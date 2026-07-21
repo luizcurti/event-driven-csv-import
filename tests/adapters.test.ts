@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 import { describe, expect, it, jest } from '@jest/globals';
-import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { createAwsClients } from '../shared/aws-clients.js';
 import { createDependencies, createAwsDependencies } from '../shared/dependencies.js';
 import { InMemoryImportStore } from '../shared/repository.js';
