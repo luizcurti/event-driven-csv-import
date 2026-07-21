@@ -57,7 +57,7 @@ export const parseCsvText = (csvText: string): Array<Record<string, string>> => 
   }
 
   const [headerRow, ...dataRows] = rows;
-  const headers = parseCsvRow(headerRow ?? '');
+  const headers = parseCsvRow(headerRow!);
 
   return dataRows.map((row) => {
     const values = parseCsvRow(row);
