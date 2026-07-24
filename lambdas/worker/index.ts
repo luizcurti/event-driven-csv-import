@@ -1,1 +1,0 @@
-export { createWorkerHandler } from './handler.js';

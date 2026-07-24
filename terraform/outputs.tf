@@ -14,6 +14,14 @@ output "api_name" {
   value = module.apigateway.api_name
 }
 
+output "api_invoke_url" {
+  value = module.apigateway.invoke_url
+}
+
+output "state_machine_arn" {
+  value = module.stepfunctions.state_machine_arn
+}
+
 output "dashboard_name" {
   value = module.cloudwatch.dashboard_name
 }

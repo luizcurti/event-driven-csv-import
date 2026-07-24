@@ -13,6 +13,7 @@
 		"lint": "eslint .",
 		"local:up": "bash ./scripts/local-up.sh",
 		"local:down": "bash ./scripts/local-down.sh",
+		"package:lambdas": "bash ./scripts/package-lambda.sh",
 		"terraform:init": "bash ./scripts/terraform-init.sh",
 		"terraform:fmt": "bash ./scripts/terraform-fmt.sh",
 		"terraform:validate": "bash ./scripts/terraform-validate.sh",
@@ -45,6 +46,7 @@
 	"dependencies": {
 		"@aws-sdk/client-dynamodb": "^3.1090.0",
 		"@aws-sdk/client-eventbridge": "^3.1090.0",
+		"@aws-sdk/client-lambda": "^3.1094.0",
 		"@aws-sdk/client-s3": "^3.1090.0",
 		"@aws-sdk/client-sfn": "^3.1090.0",
 		"@aws-sdk/client-sqs": "^3.1090.0",

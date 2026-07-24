@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+
+export const createId = (): string => randomUUID();
+
 export interface EventEnvelope<TDetail extends Record<string, unknown>> {
   version: string;
   source: string;

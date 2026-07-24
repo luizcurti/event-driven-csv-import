@@ -13,12 +13,11 @@ import {
   StorageException,
   ValidationException,
 } from '../shared/errors.js';
-import { createEvent } from '../shared/events.js';
-import { createId } from '../shared/id.js';
+import { createEvent, createId } from '../shared/events.js';
 import { Logger, createLogger } from '../shared/logger.js';
-import { InMemoryObjectStorage } from '../shared/object-storage.js';
+import { InMemoryObjectStorage, buildObjectKey } from '../shared/object-storage.js';
 import { InMemoryImportStore } from '../shared/repository.js';
-import { S3ObjectStorage, createBucketObjectKey } from '../shared/s3-object-storage.js';
+import { S3ObjectStorage } from '../shared/s3-object-storage.js';
 import { parseCsvText, splitCsvIntoChunks, mapCsvRowsToCustomerRecords } from '../shared/csv.js';
 import { validateCustomerRecord, validateUploadFile } from '../shared/validation.js';
 
@@ -361,6 +360,40 @@ describe('shared coverage', () => {
     );
     expect(endpointFallbackDependencies.logger).toBeDefined();
 
+    const explicitEndpointDependencies = createAwsDependencies(
+      {},
+      {
+        NODE_ENV: 'production',
+        IMPORTS_BUCKET: 'imports-bucket',
+        LOCALSTACK_ENDPOINT: 'http://localhost:4566',
+        AWS_REGION: 'us-east-1',
+      },
+    );
+    expect(explicitEndpointDependencies.logger).toBeDefined();
+
+    const localstackHostnameDependencies = createAwsDependencies(
+      {},
+      {
+        NODE_ENV: 'production',
+        IMPORTS_BUCKET: 'imports-bucket',
+        LOCALSTACK_HOSTNAME: 'localstack',
+        AWS_REGION: 'us-east-1',
+      },
+    );
+    expect(localstackHostnameDependencies.logger).toBeDefined();
+
+    const localstackHostnameWithPortDependencies = createAwsDependencies(
+      {},
+      {
+        NODE_ENV: 'production',
+        IMPORTS_BUCKET: 'imports-bucket',
+        LOCALSTACK_HOSTNAME: 'localstack',
+        EDGE_PORT: '4567',
+        AWS_REGION: 'us-east-1',
+      },
+    );
+    expect(localstackHostnameWithPortDependencies.logger).toBeDefined();
+
     const awsDependencies = createAwsDependencies(
       {},
       {
@@ -464,7 +497,7 @@ describe('shared coverage', () => {
     expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([expect.objectContaining({ key: 'processed/file.csv' })]);
     expect(await storage.listObjects('bucket-a')).toEqual([]);
     expect(await storage.listObjects('bucket-a', 'missing/')).toEqual([]);
-    expect(createBucketObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');
+    expect(buildObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');
 
     const plainAwsDependencies = createAwsDependencies(
       {},

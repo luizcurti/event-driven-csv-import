@@ -15,18 +15,18 @@ export interface ObjectStorage {
   listObjects?(bucket: string, prefix?: string): Promise<StoredObject[]>;
 }
 
-const objectKey = (bucket: string, key: string): string => `${bucket}/${key}`;
+export const buildObjectKey = (bucket: string, key: string): string => `${bucket}/${key}`;
 
 export class InMemoryObjectStorage implements ObjectStorage {
   private readonly objects = new Map<string, StoredObject>();
 
   async putObject(object: Omit<StoredObject, 'createdAt' | 'updatedAt'>): Promise<void> {
     const now = new Date().toISOString();
-    this.objects.set(objectKey(object.bucket, object.key), { ...object, createdAt: now, updatedAt: now });
+    this.objects.set(buildObjectKey(object.bucket, object.key), { ...object, createdAt: now, updatedAt: now });
   }
 
   async getObject(bucket: string, key: string): Promise<StoredObject | undefined> {
-    return this.objects.get(objectKey(bucket, key));
+    return this.objects.get(buildObjectKey(bucket, key));
   }
 
   async moveObject(sourceBucket: string, sourceKey: string, targetBucket: string, targetKey: string): Promise<void> {
@@ -48,7 +48,7 @@ export class InMemoryObjectStorage implements ObjectStorage {
 
     await this.putObject(nextObject);
 
-    this.objects.delete(objectKey(sourceBucket, sourceKey));
+    this.objects.delete(buildObjectKey(sourceBucket, sourceKey));
   }
 
   async listObjects(bucket: string, prefix = ''): Promise<StoredObject[]> {

@@ -4,8 +4,8 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { createAwsClients } from '../shared/aws-clients.js';
 import { createDependencies, createAwsDependencies } from '../shared/dependencies.js';
 import { InMemoryImportStore } from '../shared/repository.js';
-import { InMemoryObjectStorage } from '../shared/object-storage.js';
-import { S3ObjectStorage, createBucketObjectKey } from '../shared/s3-object-storage.js';
+import { InMemoryObjectStorage, buildObjectKey } from '../shared/object-storage.js';
+import { S3ObjectStorage } from '../shared/s3-object-storage.js';
 import { DynamoDbImportStore } from '../shared/dynamodb-import-store.js';
 import type { ImportRecord } from '../shared/types.js';
 
@@ -103,7 +103,7 @@ describe('adapter coverage', () => {
     await storage.moveObject('bucket-a', 'missing.csv', 'bucket-b', 'missing-copy.csv');
     expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([expect.objectContaining({ key: 'processed/file.csv' })]);
     expect(await storage.listObjects('bucket-a', 'missing/')).toEqual([]);
-    expect(createBucketObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');
+    expect(buildObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');
   });
 
   it('covers DynamoDB import store branches', async () => {

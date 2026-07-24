@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { ChunkProcessingException } from '../../shared/errors.js';
+import { createId } from '../../shared/events.js';
 import { mapCsvRowsToCustomerRecords, parseCsvText } from '../../shared/csv.js';
 import { validateCustomerRecord } from '../../shared/validation.js';
 import type { ChunkMessage, ChunkResult, CustomerRecord, ImportRecord } from '../../shared/types.js';
@@ -15,8 +15,8 @@ export interface WorkerResult {
 export const createWorkerHandler = ({ logger, store, storage }: AppDependencies) => {
   return async (message: ChunkMessage): Promise<WorkerResult> => {
     const startedAt = Date.now();
-    const requestId = randomUUID();
-    const workerId = randomUUID();
+    const requestId = createId();
+    const workerId = createId();
 
     const object = await storage.getObject(message.bucket, message.key);
     if (!object) {

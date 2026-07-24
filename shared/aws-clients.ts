@@ -1,6 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { EventBridgeClient } from '@aws-sdk/client-eventbridge';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { LambdaClient } from '@aws-sdk/client-lambda';
 import { S3Client } from '@aws-sdk/client-s3';
 import { SFNClient } from '@aws-sdk/client-sfn';
 import { SQSClient } from '@aws-sdk/client-sqs';
@@ -16,6 +17,7 @@ export interface AwsClients {
   sqs: SQSClient;
   eventBridge: EventBridgeClient;
   stepFunctions: SFNClient;
+  lambda: LambdaClient;
 }
 
 const createSharedConfig = (options: AwsClientOptions): {
@@ -59,6 +61,10 @@ export const createAwsClients = (options: AwsClientOptions): AwsClients => {
       ...sharedConfig,
     }),
     stepFunctions: new SFNClient({
+      region: options.region,
+      ...sharedConfig,
+    }),
+    lambda: new LambdaClient({
       region: options.region,
       ...sharedConfig,
     }),

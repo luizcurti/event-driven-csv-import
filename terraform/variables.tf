@@ -33,3 +33,21 @@ variable "worker_concurrency" {
   description = "Target worker concurrency."
   default     = 10
 }
+
+variable "use_localstack" {
+  type        = bool
+  description = "Whether to point the AWS provider at a local LocalStack endpoint instead of real AWS."
+  default     = false
+}
+
+variable "localstack_endpoint" {
+  type        = string
+  description = "LocalStack endpoint URL, used only when use_localstack is true."
+  default     = "http://localhost:4566"
+}
+
+variable "lambda_zip_path" {
+  type        = string
+  description = "Path to the packaged Lambda deployment zip (see npm run package:lambdas)."
+  default     = "./build/lambda.zip"
+}

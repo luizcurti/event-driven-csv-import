@@ -9,3 +9,6 @@ terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/crash.log
 terraform/.terraform.lock.hcl
+terraform/build
+terraform/tfplan.out
+terraform/*.tfplan

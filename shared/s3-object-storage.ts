@@ -2,8 +2,6 @@ import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type PutObjec
 import { Readable } from 'node:stream';
 import type { ObjectStorage, StoredObject } from './object-storage.js';
 
-const objectKey = (bucket: string, key: string): string => `${bucket}/${key}`;
-
 const readStream = async (stream: Readable): Promise<string> => {
   const chunks: Buffer[] = [];
 
@@ -129,5 +127,3 @@ export class S3ObjectStorage implements ObjectStorage {
     });
   }
 }
-
-export const createBucketObjectKey = objectKey;

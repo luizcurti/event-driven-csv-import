@@ -8,6 +8,13 @@ export interface CsvChunk {
 
 const normalizeLineEndings = (value: string): string => value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
+const splitCsvRows = (csvText: string): string[] =>
+  normalizeLineEndings(csvText)
+    .trim()
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
 const parseCsvRow = (line: string): string[] => {
   const values: string[] = [];
   let current = '';
@@ -42,15 +49,7 @@ const parseCsvRow = (line: string): string[] => {
 };
 
 export const parseCsvText = (csvText: string): Array<Record<string, string>> => {
-  const normalized = normalizeLineEndings(csvText).trim();
-  if (!normalized) {
-    return [];
-  }
-
-  const rows = normalized
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const rows = splitCsvRows(csvText);
 
   if (rows.length < 2) {
     return [];
@@ -69,15 +68,7 @@ export const parseCsvText = (csvText: string): Array<Record<string, string>> => 
 };
 
 export const splitCsvIntoChunks = (csvText: string, chunkSize: number): CsvChunk[] => {
-  const normalized = normalizeLineEndings(csvText).trim();
-  if (!normalized) {
-    return [];
-  }
-
-  const rows = normalized
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const rows = splitCsvRows(csvText);
 
   if (rows.length <= 1) {
     return [];

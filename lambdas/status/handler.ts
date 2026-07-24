@@ -1,14 +1,7 @@
 import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { ImportNotFoundException } from '../../shared/errors.js';
-
-const toJsonResponse = (statusCode: number, body: unknown): APIGatewayProxyStructuredResultV2 => ({
-  statusCode,
-  headers: {
-    'content-type': 'application/json',
-  },
-  body: JSON.stringify(body),
-});
+import { toJsonResponse } from '../../shared/http.js';
 
 export const createStatusHandler = ({ store }: AppDependencies) => {
   return async (importId?: string): Promise<APIGatewayProxyStructuredResultV2> => {

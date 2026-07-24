@@ -8,56 +8,34 @@ import {
 import type { ChunkResult, ImportRecord } from './types.js';
 import type { ImportStore } from './repository.js';
 
-type TableItem = ImportRecord & {
+type ImportTableItem = ImportRecord & {
   pk: string;
   sk: string;
-  entityType: 'IMPORT' | 'CHUNK_RESULT';
+  entityType: 'IMPORT';
+};
+
+type ChunkTableItem = ChunkResult & {
+  pk: string;
+  sk: string;
+  entityType: 'CHUNK_RESULT';
 };
 
 const importPk = (id: string): string => `IMPORT#${id}`;
 const importSk = 'META';
 const chunkSk = (chunkNumber: number): string => `CHUNK#${String(chunkNumber).padStart(6, '0')}`;
 
-const toImportItem = (record: ImportRecord): TableItem => ({
+const toImportItem = (record: ImportRecord): ImportTableItem => ({
   ...record,
   pk: importPk(record.id),
   sk: importSk,
   entityType: 'IMPORT',
 });
 
-const toChunkItem = (result: ChunkResult): TableItem => ({
-  id: `${result.importId}:${result.chunkNumber}`,
-  correlationId: result.correlationId,
-  filename: '',
-  bucket: '',
-  key: '',
-  status: result.status,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  totalChunks: 0,
-  processedChunks: 0,
-  totalRecords: 0,
-  processedRecords: result.recordsProcessed,
-  failedRecords: result.failedRecords,
-  successRecords: result.successRecords,
-  executionTimeMs: result.durationMs,
-  chunkSize: 0,
+const toChunkItem = (result: ChunkResult): ChunkTableItem => ({
+  ...result,
   pk: importPk(result.importId),
   sk: chunkSk(result.chunkNumber),
   entityType: 'CHUNK_RESULT',
-  workerId: result.workerId,
-  requestId: result.requestId,
-  recordsProcessed: result.recordsProcessed,
-  errors: result.errors,
-  durationMs: result.durationMs,
-  chunkNumber: result.chunkNumber,
-} as TableItem & {
-  workerId: string;
-  requestId: string;
-  recordsProcessed: number;
-  errors: string[];
-  durationMs: number;
-  chunkNumber: number;
 });
 
 const fromImportItem = (item: Record<string, unknown>): ImportRecord => ({

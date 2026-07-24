@@ -1,8 +1,9 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
-import { createId } from '../../shared/id.js';
+import { createId } from '../../shared/events.js';
 import { InvalidFileException, ValidationException } from '../../shared/errors.js';
 import { validateUploadFile } from '../../shared/validation.js';
+import { toJsonResponse } from '../../shared/http.js';
 import type { ImportRecord } from '../../shared/types.js';
 
 interface UploadedFile {
@@ -10,14 +11,6 @@ interface UploadedFile {
   contentType: string;
   body: string;
 }
-
-const toJsonResponse = (statusCode: number, body: Record<string, unknown>): APIGatewayProxyStructuredResultV2 => ({
-  statusCode,
-  headers: {
-    'content-type': 'application/json',
-  },
-  body: JSON.stringify(body),
-});
 
 const getHeader = (headers: Record<string, string | undefined>, name: string): string | undefined => {
   const targetName = name.toLowerCase();

@@ -1,27 +1,39 @@
 variable "state_machine_name" {
   type        = string
-  description = "State machine name."
+  description = "Name of the orchestration Step Functions state machine."
 }
 
-variable "chunk_size" {
-  type        = number
-  description = "Chunk size used by the orchestration."
-}
-
-variable "queue_name" {
+variable "split_function_arn" {
   type        = string
-  description = "Queue name consumed by workers."
+  description = "ARN of the split Lambda function invoked by the state machine."
 }
 
-variable "imports_bucket_name" {
+variable "role_arn" {
   type        = string
-  description = "Bucket containing the imports."
+  description = "IAM role ARN assumed by the state machine execution."
+}
+
+resource "aws_sfn_state_machine" "this" {
+  name     = var.state_machine_name
+  role_arn = var.role_arn
+
+  definition = jsonencode({
+    Comment = "Orchestrates CSV import splitting after an upload is detected."
+    StartAt = "Split"
+    States = {
+      Split = {
+        Type     = "Task"
+        Resource = var.split_function_arn
+        End      = true
+      }
+    }
+  })
+}
+
+output "state_machine_arn" {
+  value = aws_sfn_state_machine.this.arn
 }
 
 output "state_machine_name" {
-  value = var.state_machine_name
-}
-
-output "chunk_size" {
-  value = var.chunk_size
+  value = aws_sfn_state_machine.this.name
 }
