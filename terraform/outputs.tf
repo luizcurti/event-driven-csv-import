@@ -23,5 +23,5 @@ output "state_machine_arn" {
 }
 
 output "dashboard_name" {
-  value = module.cloudwatch.dashboard_name
+  value = var.use_localstack ? "" : module.cloudwatch[0].dashboard_name
 }

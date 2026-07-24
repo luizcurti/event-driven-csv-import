@@ -8,8 +8,13 @@ variable "function_names" {
   description = "Lambda function names to alarm on."
 }
 
+variable "use_localstack" {
+  type        = bool
+  description = "Whether the stack is targeting LocalStack and should skip alarm creation."
+}
+
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
-  for_each = toset(var.function_names)
+  for_each = var.use_localstack ? toset([]) : toset(var.function_names)
 
   alarm_name          = "${var.alarm_prefix}-${each.value}-errors"
   comparison_operator = "GreaterThanThreshold"
@@ -27,9 +32,9 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
 }
 
 output "alarm_prefix" {
-  value = var.alarm_prefix
+  value = var.use_localstack ? "" : var.alarm_prefix
 }
 
 output "alarm_names" {
-  value = [for alarm in aws_cloudwatch_metric_alarm.lambda_errors : alarm.alarm_name]
+  value = var.use_localstack ? [] : [for alarm in aws_cloudwatch_metric_alarm.lambda_errors : alarm.alarm_name]
 }

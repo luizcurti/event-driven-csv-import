@@ -18,7 +18,13 @@ variable "function_names" {
   description = "Lambda function names tracked on the dashboard."
 }
 
+variable "use_localstack" {
+  type        = bool
+  description = "Whether the stack is targeting LocalStack and should skip dashboard creation."
+}
+
 resource "aws_cloudwatch_dashboard" "this" {
+  count          = var.use_localstack ? 0 : 1
   dashboard_name = var.dashboard_name
 
   dashboard_body = jsonencode({
@@ -70,5 +76,5 @@ resource "aws_cloudwatch_dashboard" "this" {
 }
 
 output "dashboard_name" {
-  value = aws_cloudwatch_dashboard.this.dashboard_name
+  value = var.use_localstack ? "" : aws_cloudwatch_dashboard.this[0].dashboard_name
 }

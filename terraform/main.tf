@@ -158,6 +158,7 @@ module "cloudwatch" {
   dashboard_name   = "${local.name_prefix}-dashboard"
   metric_namespace = var.project_name
   aws_region       = var.aws_region
+  use_localstack   = var.use_localstack
   function_names = [
     module.lambda_upload.function_name,
     module.lambda_split.function_name,
@@ -170,7 +171,8 @@ module "cloudwatch" {
 module "alarms" {
   source = "./modules/alarms"
 
-  alarm_prefix = local.name_prefix
+  alarm_prefix   = local.name_prefix
+  use_localstack = var.use_localstack
   function_names = [
     module.lambda_upload.function_name,
     module.lambda_split.function_name,
