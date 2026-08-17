@@ -51,4 +51,24 @@ describe('csv helpers', () => {
       },
     ]);
   });
+
+  it('keeps a quoted field with an embedded newline as a single row', () => {
+    const csv = [
+      'customerId,name,notes,cpf,age',
+      '1,Alice,"Line one\nLine two",52998224725,30',
+      '2,Bob,plain notes,12345678909,40',
+    ].join('\n');
+
+    const rows = parseCsvText(csv);
+
+    expect(rows).toEqual([
+      { customerId: '1', name: 'Alice', notes: 'Line one\nLine two', cpf: '52998224725', age: '30' },
+      { customerId: '2', name: 'Bob', notes: 'plain notes', cpf: '12345678909', age: '40' },
+    ]);
+
+    const chunks = splitCsvIntoChunks(csv, 1);
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]?.records).toBe(1);
+    expect(chunks[0]?.content).toContain('Line one\nLine two');
+  });
 });

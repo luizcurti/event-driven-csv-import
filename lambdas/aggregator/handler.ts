@@ -21,6 +21,30 @@ export const createAggregatorHandler = ({ logger, store }: AppDependencies) => {
     }
 
     const chunkResults = await store.listChunkResults(importId);
+
+    // The Aggregator is the source of truth for "is this import actually
+    // done" — it must not finalize a status while chunks are still
+    // outstanding, even if it gets invoked early (a race between concurrent
+    // Workers) or replayed after the fact.
+    if (currentImport.totalChunks === 0 || chunkResults.length < currentImport.totalChunks) {
+      logger.warn('Aggregation skipped: import still has pending chunks', {
+        importId,
+        totalChunks: currentImport.totalChunks,
+        processedChunks: chunkResults.length,
+      });
+
+      return {
+        importId,
+        status: currentImport.status,
+        processedRecords: currentImport.processedRecords,
+        successRecords: currentImport.successRecords,
+        failedRecords: currentImport.failedRecords,
+        totalChunks: currentImport.totalChunks,
+        processedChunks: chunkResults.length,
+        executionTimeMs: currentImport.executionTimeMs ?? 0,
+      };
+    }
+
     const processedRecords = chunkResults.reduce((sum, result) => sum + result.recordsProcessed, 0);
     const successRecords = chunkResults.reduce((sum, result) => sum + result.successRecords, 0);
     const failedRecords = chunkResults.reduce((sum, result) => sum + result.failedRecords, 0);

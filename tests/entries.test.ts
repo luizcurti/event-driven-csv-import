@@ -87,6 +87,24 @@ describe('lambda entry adapters', () => {
     expect(JSON.parse(response.body ?? '{}')).toMatchObject({ code: 'IMPORT_NOT_FOUND' });
   });
 
+  it('rejects an invalid file upload with 400/INVALID_FILE instead of a generic 500', async () => {
+    const dependencies = createDependencies();
+    const handler = createUploadEntryHandler(dependencies);
+
+    const response = await handler({
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        fileName: 'customers.txt',
+        contentType: 'text/csv',
+        body: 'customerId,name,email,cpf,age\n1,Alice,alice@example.com,52998224725,30',
+      }),
+      isBase64Encoded: false,
+    } as never);
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body ?? '{}')).toMatchObject({ code: 'INVALID_FILE' });
+  });
+
   it('converts an unexpected non-AppError thrown by the upload handler into a generic 500 response', async () => {
     const dependencies = createDependencies();
     const brokenStore = {
@@ -169,6 +187,7 @@ describe('lambda entry adapters', () => {
       body: 'customerId,name,email,cpf,age\n1,Alice,alice@example.com,52998224725,30',
       contentType: 'text/csv',
     });
+    await dependencies.store.saveImport(baseImport({ totalChunks: 1 }));
 
     const message: ChunkMessage = {
       importId: 'import-1',

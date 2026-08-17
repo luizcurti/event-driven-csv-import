@@ -18,13 +18,8 @@ export const createWorkerEntryHandler = (
 ) => {
   const workerHandler = createWorkerHandler(dependencies);
 
-  const maybeInvokeAggregator = async (importId: string): Promise<void> => {
-    if (!aggregatorFunctionName) {
-      return;
-    }
-
-    const currentImport = await dependencies.store.getImport(importId);
-    if (!currentImport || currentImport.processedChunks < currentImport.totalChunks) {
+  const maybeInvokeAggregator = async (importId: string, processedChunks: number, totalChunks: number): Promise<void> => {
+    if (!aggregatorFunctionName || processedChunks < totalChunks) {
       return;
     }
 
@@ -43,8 +38,14 @@ export const createWorkerEntryHandler = (
     for (const record of event.Records) {
       try {
         const message = JSON.parse(record.body) as ChunkMessage;
-        await workerHandler(message);
-        await maybeInvokeAggregator(message.importId);
+        const workerResult = await workerHandler(message);
+        // Using the counter value returned by this exact invocation (rather
+        // than re-reading the import afterwards) is what makes this safe
+        // under concurrent Workers: it's the atomic result of *this* chunk's
+        // increment, not a snapshot another Worker could have already moved
+        // past — so only the Worker that truly finishes the last chunk
+        // invokes the Aggregator.
+        await maybeInvokeAggregator(message.importId, workerResult.processedChunks, message.totalChunks);
       } catch {
         batchItemFailures.push({ itemIdentifier: record.messageId });
       }

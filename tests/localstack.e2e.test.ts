@@ -131,7 +131,10 @@ suite('localstack integration flow', () => {
     queueUrl = await ensureQueue(clients.sqs);
     await ensureEventBus(clients.eventBridge);
     stateMachineArn = await ensureStateMachine(clients.stepFunctions);
-  });
+    // A freshly started LocalStack container lazily initializes each service
+    // provider on first use, so provisioning five resources back-to-back can
+    // comfortably exceed Jest's default 5s hook timeout on a cold container.
+  }, 30000);
 
   it('processes a csv through localstack-backed storage', async () => {
     if (!endpoint) {

@@ -1,3 +1,4 @@
+import { InvalidFileException } from './errors.js';
 import type { CustomerRecord, ValidationIssue } from './types.js';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -62,14 +63,14 @@ export const validateUploadFile = (
   const normalizedFileName = fileName.trim().toLowerCase();
 
   if (!normalizedFileName.endsWith('.csv')) {
-    throw new Error('Only CSV files are accepted.');
+    throw new InvalidFileException('Only CSV files are accepted.');
   }
 
   if (!allowedMimeTypes.includes(contentType.toLowerCase())) {
-    throw new Error('Unsupported file content type.');
+    throw new InvalidFileException('Unsupported file content type.');
   }
 
   if (sizeBytes > maxFileSizeBytes) {
-    throw new Error('File size exceeds the configured limit.');
+    throw new InvalidFileException('File size exceeds the configured limit.');
   }
 };

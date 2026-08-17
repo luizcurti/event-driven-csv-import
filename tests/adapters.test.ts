@@ -1,6 +1,7 @@
 import { Readable } from 'node:stream';
 import { describe, expect, it, jest } from '@jest/globals';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { createAwsClients } from '../shared/aws-clients.js';
 import { createDependencies, createAwsDependencies } from '../shared/dependencies.js';
 import { InMemoryImportStore } from '../shared/repository.js';
@@ -8,6 +9,83 @@ import { InMemoryObjectStorage, buildObjectKey } from '../shared/object-storage.
 import { S3ObjectStorage } from '../shared/s3-object-storage.js';
 import { DynamoDbImportStore } from '../shared/dynamodb-import-store.js';
 import type { ImportRecord } from '../shared/types.js';
+
+/** Minimal fake DynamoDB table keyed by `pk#sk`, faithful enough to exercise
+ * the conditional/partial UpdateExpression logic in DynamoDbImportStore. */
+const createFakeTable = () => {
+  const items = new Map<string, Record<string, unknown>>();
+
+  const applySetClauses = (
+    item: Record<string, unknown>,
+    names: Record<string, string>,
+    values: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const updated = { ...item };
+    for (const [nameToken, field] of Object.entries(names)) {
+      const valueToken = `:v${nameToken.slice(2)}`;
+      updated[field] = values[valueToken];
+    }
+    return updated;
+  };
+
+  const send = jest.fn(async (command: unknown) => {
+    const name = (command as { constructor?: { name?: string } }).constructor?.name;
+    const input = (command as { input?: Record<string, unknown> }).input ?? {};
+
+    if (name === 'PutCommand') {
+      const item = input.Item as Record<string, unknown>;
+      items.set(`${item.pk as string}#${item.sk as string}`, item);
+      return {};
+    }
+
+    if (name === 'GetCommand') {
+      const key = input.Key as { pk: string; sk: string };
+      return { Item: items.get(`${key.pk}#${key.sk}`) };
+    }
+
+    if (name === 'ScanCommand') {
+      return { Items: Array.from(items.values()).filter((item) => item.entityType === 'IMPORT') };
+    }
+
+    if (name === 'QueryCommand') {
+      const pk = (input.ExpressionAttributeValues as Record<string, unknown>)[':pk'] as string;
+      return { Items: Array.from(items.values()).filter((item) => item.pk === pk && item.entityType === 'CHUNK_RESULT') };
+    }
+
+    if (name === 'UpdateCommand') {
+      const key = input.Key as { pk: string; sk: string };
+      const itemKey = `${key.pk}#${key.sk}`;
+      const existing = items.get(itemKey);
+
+      if (!existing) {
+        throw new ConditionalCheckFailedException({ message: 'The conditional request failed', $metadata: {} });
+      }
+
+      if ((input.UpdateExpression as string).startsWith('ADD ')) {
+        const increment = (input.ExpressionAttributeValues as Record<string, number>)[':increment'] ?? 0;
+        const updated = {
+          ...existing,
+          processedChunks: Number(existing.processedChunks ?? 0) + increment,
+          updatedAt: (input.ExpressionAttributeValues as Record<string, unknown>)[':updatedAt'],
+        };
+        items.set(itemKey, updated);
+        return { Attributes: { processedChunks: updated.processedChunks } };
+      }
+
+      const updated = applySetClauses(
+        existing,
+        input.ExpressionAttributeNames as Record<string, string>,
+        input.ExpressionAttributeValues as Record<string, unknown>,
+      );
+      items.set(itemKey, updated);
+      return { Attributes: updated };
+    }
+
+    return {};
+  });
+
+  return { send, items };
+};
 
 describe('adapter coverage', () => {
   it('covers AWS client wiring and dependency factories', () => {
@@ -107,39 +185,7 @@ describe('adapter coverage', () => {
   });
 
   it('covers DynamoDB import store branches', async () => {
-    const storedImports = new Map<string, Record<string, unknown>>();
-    const chunkResults: Record<string, unknown>[] = [];
-
-    const send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
-
-      if (name === 'PutCommand') {
-        const input = (command as { input?: { Item?: Record<string, unknown> } }).input;
-        if (input?.Item?.entityType === 'IMPORT' && typeof input.Item.pk === 'string') {
-          storedImports.set(input.Item.pk, input.Item);
-        } else if (input?.Item?.entityType === 'CHUNK_RESULT') {
-          chunkResults.push(input.Item);
-        }
-        return {};
-      }
-
-      if (name === 'GetCommand') {
-        const input = (command as unknown as { input?: { Key?: { pk?: string } } }).input;
-        const key = input?.Key?.pk ?? '';
-        return { Item: storedImports.get(key) };
-      }
-
-      if (name === 'ScanCommand') {
-        return { Items: Array.from(storedImports.values()) };
-      }
-
-      if (name === 'QueryCommand') {
-        return { Items: chunkResults };
-      }
-
-      return {};
-    });
-
+    const { send } = createFakeTable();
     const store = new DynamoDbImportStore({ send } as never, 'imports-table');
     const now = new Date().toISOString();
     const importRecord: ImportRecord = {
@@ -191,7 +237,7 @@ describe('adapter coverage', () => {
     await store.saveImport(compactImport);
     expect(await store.getImport('import-2')).toMatchObject({ id: 'import-2', filename: 'compact.csv' });
 
-    await store.saveChunkResult({
+    const firstSave = await store.saveChunkResult({
       importId: 'import-1',
       chunkNumber: 2,
       workerId: 'worker-2',
@@ -204,6 +250,23 @@ describe('adapter coverage', () => {
       durationMs: 5,
       correlationId: 'correlation-1',
     });
+    expect(firstSave).toEqual({ isNewChunk: true });
+
+    const redelivery = await store.saveChunkResult({
+      importId: 'import-1',
+      chunkNumber: 2,
+      workerId: 'worker-2-retry',
+      requestId: 'request-2-retry',
+      status: 'COMPLETED',
+      recordsProcessed: 1,
+      successRecords: 1,
+      failedRecords: 0,
+      errors: [],
+      durationMs: 5,
+      correlationId: 'correlation-1',
+    });
+    expect(redelivery).toEqual({ isNewChunk: false });
+
     await store.saveChunkResult({
       importId: 'import-1',
       chunkNumber: 1,
@@ -222,6 +285,28 @@ describe('adapter coverage', () => {
       expect.objectContaining({ chunkNumber: 1 }),
       expect.objectContaining({ chunkNumber: 2 }),
     ]);
+
+    expect(await store.incrementProcessedChunks('import-1')).toBe(2);
+    expect(await store.incrementProcessedChunks('import-1')).toBe(3);
+  });
+
+  it('propagates unexpected updateImport errors instead of swallowing them', async () => {
+    const send = jest.fn(async (command: unknown) => {
+      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      if (name === 'UpdateCommand') {
+        throw new Error('network blip');
+      }
+      return {};
+    });
+
+    const store = new DynamoDbImportStore({ send } as never, 'imports-table');
+    await expect(store.updateImport('import-1', { status: 'FAILED' })).rejects.toThrow('network blip');
+  });
+
+  it('defaults incrementProcessedChunks to 0 when DynamoDB returns no attributes', async () => {
+    const send = jest.fn(async () => ({}));
+    const store = new DynamoDbImportStore({ send } as never, 'imports-table');
+    expect(await store.incrementProcessedChunks('import-1')).toBe(0);
   });
 
   it('covers DynamoDB defaults and empty responses', async () => {

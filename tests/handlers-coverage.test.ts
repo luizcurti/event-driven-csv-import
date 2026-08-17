@@ -229,16 +229,23 @@ describe('handler coverage', () => {
       contentType: 'text/csv',
     });
 
-    expect(
-      (await createWorkerHandler(completedDependencies)({
-        importId: completedImport.id,
-        chunkNumber: 1,
-        bucket: completedDependencies.config.importsBucket,
-        key: 'processing/import-1/chunk-0001.csv',
-        totalChunks: 1,
-        correlationId: completedImport.correlationId,
-      })).result.status,
-    ).toBe('COMPLETED');
+    const chunkMessage = {
+      importId: completedImport.id,
+      chunkNumber: 1,
+      bucket: completedDependencies.config.importsBucket,
+      key: 'processing/import-1/chunk-0001.csv',
+      totalChunks: 1,
+      correlationId: completedImport.correlationId,
+    };
+
+    const firstAttempt = await createWorkerHandler(completedDependencies)(chunkMessage);
+    expect(firstAttempt.result.status).toBe('COMPLETED');
+    expect(firstAttempt.processedChunks).toBe(1);
+
+    // Simulates an SQS at-least-once redelivery of the same chunk: it must
+    // not double-count against the atomic processedChunks counter.
+    const redeliveredAttempt = await createWorkerHandler(completedDependencies)(chunkMessage);
+    expect(redeliveredAttempt.processedChunks).toBe(1);
 
     const partialDependencies = createTestDependencies();
     const partialImport = await seedImport(partialDependencies, { status: 'QUEUED' });
@@ -344,6 +351,29 @@ describe('handler coverage', () => {
     });
     expect((await createAggregatorHandler(failedDependencies)(failedImport.id)).status).toBe('FAILED');
     await expect(createAggregatorHandler(createTestDependencies())('missing')).rejects.toThrow('Import not found.');
+
+    // Guards against finalizing early if invoked before every chunk lands
+    // (e.g. a premature or replayed invocation): status must not flip to a
+    // terminal state while chunks are still outstanding.
+    const pendingDependencies = createTestDependencies();
+    const pendingImport = await seedImport(pendingDependencies, { totalChunks: 2, status: 'RUNNING' });
+    await pendingDependencies.store.saveChunkResult({
+      importId: pendingImport.id,
+      chunkNumber: 1,
+      workerId: 'worker-1',
+      requestId: 'request-1',
+      status: 'COMPLETED',
+      recordsProcessed: 1,
+      successRecords: 1,
+      failedRecords: 0,
+      errors: [],
+      durationMs: 5,
+      correlationId: pendingImport.correlationId,
+    });
+    const pendingResult = await createAggregatorHandler(pendingDependencies)(pendingImport.id);
+    expect(pendingResult.status).toBe('RUNNING');
+    expect(pendingResult.processedChunks).toBe(1);
+    expect(await pendingDependencies.store.getImport(pendingImport.id)).toMatchObject({ status: 'RUNNING' });
 
     const statusDependencies = createTestDependencies();
     const statusImport = await seedImport(statusDependencies);

@@ -331,6 +331,10 @@ describe('shared coverage', () => {
       expect.objectContaining({ chunkNumber: 1 }),
       expect.objectContaining({ chunkNumber: 2 }),
     ]);
+
+    expect(await store.incrementProcessedChunks('import-1')).toBe(1);
+    expect(await store.incrementProcessedChunks('import-1')).toBe(2);
+    await expect(store.incrementProcessedChunks('missing')).rejects.toThrow('Import "missing" not found.');
   });
 
   it('covers aws client and adapter branches', async () => {

@@ -1,12 +1,14 @@
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import {
   GetCommand,
   PutCommand,
   QueryCommand,
   ScanCommand,
+  UpdateCommand,
   type DynamoDBDocumentClient,
 } from '@aws-sdk/lib-dynamodb';
 import type { ChunkResult, ImportRecord } from './types.js';
-import type { ImportStore } from './repository.js';
+import type { ImportStore, SaveChunkResultOutcome } from './repository.js';
 
 type ImportTableItem = ImportRecord & {
   pk: string;
@@ -119,29 +121,73 @@ export class DynamoDbImportStore implements ImportStore {
     return (response.Items ?? []).map(fromImportItem);
   }
 
+  /**
+   * Updates only the given fields via a DynamoDB partial UpdateExpression
+   * instead of a get-modify-put of the whole item. A get-modify-put would let
+   * a concurrent Worker's `incrementProcessedChunks` (or another concurrent
+   * `updateImport`) land between our read and write and get silently
+   * overwritten by our stale copy of the item.
+   */
   async updateImport(id: string, patch: Partial<ImportRecord>): Promise<ImportRecord | undefined> {
-    const current = await this.getImport(id);
-    if (!current) {
-      return undefined;
+    const entries = Object.entries({ ...patch, updatedAt: new Date().toISOString() });
+
+    const expressionAttributeNames: Record<string, string> = {};
+    const expressionAttributeValues: Record<string, unknown> = {};
+    const setClauses = entries.map(([key, value], index) => {
+      const nameToken = `#f${index}`;
+      const valueToken = `:v${index}`;
+      expressionAttributeNames[nameToken] = key;
+      expressionAttributeValues[valueToken] = value;
+      return `${nameToken} = ${valueToken}`;
+    });
+
+    try {
+      const response = await this.client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { pk: importPk(id), sk: importSk },
+          UpdateExpression: `SET ${setClauses.join(', ')}`,
+          ConditionExpression: 'attribute_exists(pk)',
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ReturnValues: 'ALL_NEW',
+        }),
+      );
+
+      return fromImportItem(response.Attributes!);
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) {
+        return undefined;
+      }
+
+      throw error;
     }
-
-    const updated = {
-      ...current,
-      ...patch,
-      updatedAt: new Date().toISOString(),
-    } satisfies ImportRecord;
-
-    await this.saveImport(updated);
-    return updated;
   }
 
-  async saveChunkResult(result: ChunkResult): Promise<void> {
+  /**
+   * Reports whether the chunk was already recorded so the caller only
+   * increments the processed-chunk counter once per distinct chunk, even if
+   * an SQS redelivery causes the same chunk to be processed more than once.
+   */
+  async saveChunkResult(result: ChunkResult): Promise<SaveChunkResultOutcome> {
+    const existing = await this.client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: {
+          pk: importPk(result.importId),
+          sk: chunkSk(result.chunkNumber),
+        },
+      }),
+    );
+
     await this.client.send(
       new PutCommand({
         TableName: this.tableName,
         Item: toChunkItem(result),
       }),
     );
+
+    return { isNewChunk: !existing.Item };
   }
 
   async listChunkResults(importId: string): Promise<ChunkResult[]> {
@@ -161,5 +207,27 @@ export class DynamoDbImportStore implements ImportStore {
     );
 
     return (response.Items ?? []).map(fromChunkItem).sort((left, right) => left.chunkNumber - right.chunkNumber);
+  }
+
+  /**
+   * Atomic DynamoDB `ADD` so two Workers finishing different chunks at
+   * nearly the same time each get a distinct, correct counter value back —
+   * neither can observe a stale count and both decide they're "last".
+   */
+  async incrementProcessedChunks(importId: string): Promise<number> {
+    const response = await this.client.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { pk: importPk(importId), sk: importSk },
+        UpdateExpression: 'ADD processedChunks :increment SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: {
+          ':increment': 1,
+          ':updatedAt': new Date().toISOString(),
+        },
+        ReturnValues: 'UPDATED_NEW',
+      }),
+    );
+
+    return Number(response.Attributes?.processedChunks ?? 0);
   }
 }

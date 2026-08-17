@@ -8,12 +8,37 @@ export interface CsvChunk {
 
 const normalizeLineEndings = (value: string): string => value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
-const splitCsvRows = (csvText: string): string[] =>
-  normalizeLineEndings(csvText)
-    .trim()
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+// Quote-aware: a plain `split('\n')` would break a row apart wherever a
+// quoted field (e.g. an address or notes column) contains a literal
+// newline, corrupting that row and every chunk boundary after it.
+const splitCsvRows = (csvText: string): string[] => {
+  const text = normalizeLineEndings(csvText).trim();
+  const rows: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (character === '"') {
+      inQuotes = !inQuotes;
+    }
+
+    if (character === '\n' && !inQuotes) {
+      rows.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += character;
+  }
+
+  if (current.length > 0) {
+    rows.push(current.trim());
+  }
+
+  return rows.filter(Boolean);
+};
 
 const parseCsvRow = (line: string): string[] => {
   const values: string[] = [];

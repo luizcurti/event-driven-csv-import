@@ -10,6 +10,7 @@ export interface WorkerResult {
   chunkNumber: number;
   result: ChunkResult;
   records: CustomerRecord[];
+  processedChunks: number;
 }
 
 export const createWorkerHandler = ({ logger, store, storage }: AppDependencies) => {
@@ -51,11 +52,14 @@ export const createWorkerHandler = ({ logger, store, storage }: AppDependencies)
       correlationId: message.correlationId,
     };
 
-    await store.saveChunkResult(result);
+    // saveChunkResult upserts by chunkNumber (an SQS redelivery of this same
+    // chunk must not double-count), so only a genuinely new chunk bumps the
+    // atomic processedChunks counter that gates the Aggregator invocation.
+    const { isNewChunk } = await store.saveChunkResult(result);
     const chunkResults = await store.listChunkResults(message.importId);
+    const processedChunks = isNewChunk ? await store.incrementProcessedChunks(message.importId) : chunkResults.length;
     await store.updateImport(message.importId, {
       status: 'RUNNING',
-      processedChunks: chunkResults.length,
       processedRecords: chunkResults.reduce((sum, current) => sum + current.recordsProcessed, 0),
       successRecords: chunkResults.reduce((sum, current) => sum + current.successRecords, 0),
       failedRecords: chunkResults.reduce((sum, current) => sum + current.failedRecords, 0),
@@ -77,6 +81,7 @@ export const createWorkerHandler = ({ logger, store, storage }: AppDependencies)
       chunkNumber: message.chunkNumber,
       result,
       records: validatedRecords,
+      processedChunks,
     };
   };
 };
