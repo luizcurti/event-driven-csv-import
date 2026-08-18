@@ -3,6 +3,7 @@ import type { LambdaClient } from '@aws-sdk/client-lambda';
 import { InvokeCommand } from '@aws-sdk/client-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { createAwsDependencies, resolveAwsClients } from '../../shared/dependencies.js';
+import { withMetrics } from '../../shared/metrics.js';
 import { createWorkerHandler } from './handler.js';
 import type { ChunkMessage } from '../../shared/types.js';
 
@@ -56,8 +57,7 @@ export const createWorkerEntryHandler = (
 };
 
 const awsClients = resolveAwsClients();
-export const handler = createWorkerEntryHandler(
-  createAwsDependencies(),
-  awsClients.lambda,
-  process.env.AGGREGATOR_FUNCTION_NAME ?? '',
+export const handler = withMetrics(
+  'worker',
+  createWorkerEntryHandler(createAwsDependencies({}, process.env, 'worker'), awsClients.lambda, process.env.AGGREGATOR_FUNCTION_NAME ?? ''),
 );

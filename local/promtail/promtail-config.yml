@@ -1,0 +1,36 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/(.*)"
+        target_label: container
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      # Our Lambdas and services log structured JSON (see shared/logger.ts), but
+      # the Lambda runtime prefixes each line with "<timestamp>\t<requestId>\t<level>\t"
+      # before the JSON payload, so the JSON object is extracted first. Lines with
+      # no JSON object (e.g. LocalStack's own logs) simply skip the remaining stages.
+      - regex:
+          expression: '(?P<content>\{.*\})\s*$'
+      - json:
+          source: content
+          expressions:
+            scope: scope
+            level: level
+      - labels:
+          scope:
+          level:

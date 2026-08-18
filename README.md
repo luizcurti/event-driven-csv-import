@@ -13,11 +13,12 @@ The system simulates an asynchronous ingestion pipeline with upload, split, para
 - `lambdas/worker`: parallel chunk processing
 - `lambdas/aggregator`: result consolidation
 - `lambdas/status`: import lookup
-- `shared`: types, validations, in-memory storage, and structured logging
+- `shared`: types, validations, in-memory storage, structured logging, and metrics
 - `tests`: unit and end-to-end coverage
 - `terraform`: infrastructure as code
 - `scripts`: shell helpers for Docker and Terraform workflows
 - `postman`: API collection for the implemented routes
+- `local`: config for the local observability stack (Prometheus, Grafana, Loki, Promtail)
 
 ## Prerequisites
 
@@ -49,6 +50,17 @@ The LocalStack flow uses the following Terraform helpers:
 4. `npm run terraform:plan`
 
 The local end-to-end test creates the required bucket and table automatically and exercises the full flow against LocalStack-backed storage.
+
+## Observability (local)
+
+`npm run local:up` also starts a local observability stack alongside LocalStack:
+
+- **Grafana** — http://localhost:3000 (`admin` / `admin`), with a `Lambda overview` dashboard pre-provisioned (invocations, error rate, p95 duration, and logs)
+- **Prometheus** — http://localhost:9090
+- **Pushgateway** — http://localhost:9091 (Lambdas are short-lived, so each invocation pushes its metrics here instead of being scraped directly)
+- **Loki** — logs from every local container, parsed as JSON and filterable by function via the `scope` label (see `shared/logger.ts`)
+
+This is only wired up locally: Lambdas only push metrics when `PUSHGATEWAY_URL` is set, which Terraform only does when `use_localstack = true` (see `terraform/variables.tf`). A real AWS deployment never sets it, so it never attempts to reach a Pushgateway. When applying Terraform locally, pass `-var use_localstack=true` (and `-var localstack_endpoint=...` as needed) so the Lambdas are wired to the local Pushgateway.
 
 ## API
 

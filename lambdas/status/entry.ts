@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { createAwsDependencies } from '../../shared/dependencies.js';
 import { toErrorResponse } from '../../shared/http.js';
+import { withMetrics } from '../../shared/metrics.js';
 import { createStatusHandler } from './handler.js';
 
 /**
@@ -23,4 +24,4 @@ export const createStatusEntryHandler = (dependencies: AppDependencies) => {
   };
 };
 
-export const handler = createStatusEntryHandler(createAwsDependencies());
+export const handler = withMetrics('status', createStatusEntryHandler(createAwsDependencies({}, process.env, 'status')));

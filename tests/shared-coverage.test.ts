@@ -353,6 +353,11 @@ describe('shared coverage', () => {
     const defaultAwsDependencies = createAwsDependencies();
     expect(defaultAwsDependencies.logger).toBeDefined();
 
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+    createAwsDependencies({}, { IMPORTS_BUCKET: 'imports-bucket' }, 'worker').logger.info('scoped');
+    expect(JSON.parse(infoSpy.mock.calls[0]?.[0] as string)).toMatchObject({ scope: 'worker' });
+    infoSpy.mockRestore();
+
     const endpointFallbackDependencies = createAwsDependencies(
       {},
       {

@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyEventV2, APIGatewayProxyResul
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { createAwsDependencies } from '../../shared/dependencies.js';
 import { toErrorResponse } from '../../shared/http.js';
+import { withMetrics } from '../../shared/metrics.js';
 import { createUploadHandler } from './handler.js';
 
 /**
@@ -25,4 +26,4 @@ export const createUploadEntryHandler = (dependencies: AppDependencies) => {
   };
 };
 
-export const handler = createUploadEntryHandler(createAwsDependencies());
+export const handler = withMetrics('upload', createUploadEntryHandler(createAwsDependencies({}, process.env, 'upload')));

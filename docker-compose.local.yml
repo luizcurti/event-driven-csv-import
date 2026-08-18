@@ -11,9 +11,86 @@ services:
       - AWS_SECRET_ACCESS_KEY=test
       - DEBUG=0
       - PERSISTENCE=1
+      # Lets the ephemeral containers LocalStack spins up per Lambda invocation
+      # join this network, so they can resolve the pushgateway service by name.
+      - LAMBDA_DOCKER_NETWORK=event-driven-observability
     volumes:
       - localstack-data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - observability
+
+  pushgateway:
+    image: prom/pushgateway:v1.9.0
+    container_name: document-processing-pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: document-processing-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - observability
+    depends_on:
+      - pushgateway
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: document-processing-loki
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./local/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    networks:
+      - observability
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: document-processing-promtail
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./local/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - observability
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: document-processing-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./local/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - observability
+    depends_on:
+      - prometheus
+      - loki
+
+networks:
+  observability:
+    name: event-driven-observability
 
 volumes:
   localstack-data:
+  prometheus-data:
+  loki-data:
+  grafana-data:

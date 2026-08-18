@@ -42,7 +42,11 @@ export const resolveAwsClients = (env: NodeJS.ProcessEnv = process.env): AwsClie
   return endpoint ? createAwsClients({ region, endpoint }) : createAwsClients({ region });
 };
 
-export const createAwsDependencies = (overrides: Partial<AppDependencies> = {}, env: NodeJS.ProcessEnv = process.env): AppDependencies => {
+export const createAwsDependencies = (
+  overrides: Partial<AppDependencies> = {},
+  env: NodeJS.ProcessEnv = process.env,
+  serviceName = 'app',
+): AppDependencies => {
   const config = overrides.config ?? loadConfig(env);
   const endpoint = resolveEndpoint(env);
   const clients = resolveAwsClients(env);
@@ -50,7 +54,7 @@ export const createAwsDependencies = (overrides: Partial<AppDependencies> = {}, 
 
   return {
     config,
-    logger: overrides.logger ?? createLogger('app', { mode: endpoint ? 'localstack' : 'aws' }),
+    logger: overrides.logger ?? createLogger(serviceName, { mode: endpoint ? 'localstack' : 'aws' }),
     store: overrides.store ?? new DynamoDbImportStore(clients.dynamoDb, tableName),
     storage: overrides.storage ?? new S3ObjectStorage(clients.s3, config.importsBucket),
   };

@@ -55,6 +55,7 @@ module "lambda_upload" {
     IMPORTS_BUCKET     = module.s3.bucket_name
     IMPORTS_TABLE_NAME = module.dynamodb.table_name
     CHUNK_SIZE         = tostring(var.chunk_size)
+    PUSHGATEWAY_URL    = var.use_localstack ? var.pushgateway_url : ""
   }
 }
 
@@ -71,6 +72,7 @@ module "lambda_split" {
     IMPORTS_TABLE_NAME   = module.dynamodb.table_name
     CHUNK_SIZE           = tostring(var.chunk_size)
     PROCESSING_QUEUE_URL = module.sqs.queue_url
+    PUSHGATEWAY_URL      = var.use_localstack ? var.pushgateway_url : ""
   }
 }
 
@@ -87,6 +89,7 @@ module "lambda_worker" {
     IMPORTS_TABLE_NAME       = module.dynamodb.table_name
     WORKER_CONCURRENCY       = tostring(var.worker_concurrency)
     AGGREGATOR_FUNCTION_NAME = local.aggregator_function_name
+    PUSHGATEWAY_URL          = var.use_localstack ? var.pushgateway_url : ""
   }
 }
 
@@ -101,6 +104,7 @@ module "lambda_aggregator" {
   environment = {
     IMPORTS_BUCKET     = module.s3.bucket_name
     IMPORTS_TABLE_NAME = module.dynamodb.table_name
+    PUSHGATEWAY_URL    = var.use_localstack ? var.pushgateway_url : ""
   }
 }
 
@@ -115,6 +119,7 @@ module "lambda_status" {
   environment = {
     IMPORTS_BUCKET     = module.s3.bucket_name
     IMPORTS_TABLE_NAME = module.dynamodb.table_name
+    PUSHGATEWAY_URL    = var.use_localstack ? var.pushgateway_url : ""
   }
 }
 

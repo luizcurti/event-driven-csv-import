@@ -1,5 +1,6 @@
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { createAwsDependencies } from '../../shared/dependencies.js';
+import { withMetrics } from '../../shared/metrics.js';
 import { createAggregatorHandler, type AggregationResult } from './handler.js';
 
 export interface AggregatorEntryInput {
@@ -15,4 +16,4 @@ export const createAggregatorEntryHandler = (dependencies: AppDependencies) => {
   return async (event: AggregatorEntryInput): Promise<AggregationResult> => aggregatorHandler(event.importId);
 };
 
-export const handler = createAggregatorEntryHandler(createAwsDependencies());
+export const handler = withMetrics('aggregator', createAggregatorEntryHandler(createAwsDependencies({}, process.env, 'aggregator')));

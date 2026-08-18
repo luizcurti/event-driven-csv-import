@@ -51,3 +51,9 @@ variable "lambda_zip_path" {
   description = "Path to the packaged Lambda deployment zip (see npm run package:lambdas)."
   default     = "./build/lambda.zip"
 }
+
+variable "pushgateway_url" {
+  type        = string
+  description = "Prometheus Pushgateway URL, used only when use_localstack is true (see docker-compose.local.yml)."
+  default     = "http://pushgateway:9091"
+}
