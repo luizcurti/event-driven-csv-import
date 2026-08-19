@@ -3,9 +3,15 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { createAwsClients } from '../shared/aws-clients.js';
-import { createDependencies, createAwsDependencies } from '../shared/dependencies.js';
+import {
+  createDependencies,
+  createAwsDependencies,
+} from '../shared/dependencies.js';
 import { InMemoryImportStore } from '../shared/repository.js';
-import { InMemoryObjectStorage, buildObjectKey } from '../shared/object-storage.js';
+import {
+  InMemoryObjectStorage,
+  buildObjectKey,
+} from '../shared/object-storage.js';
 import { S3ObjectStorage } from '../shared/s3-object-storage.js';
 import { DynamoDbImportStore } from '../shared/dynamodb-import-store.js';
 import type { ImportRecord } from '../shared/types.js';
@@ -29,7 +35,8 @@ const createFakeTable = () => {
   };
 
   const send = jest.fn(async (command: unknown) => {
-    const name = (command as { constructor?: { name?: string } }).constructor?.name;
+    const name = (command as { constructor?: { name?: string } }).constructor
+      ?.name;
     const input = (command as { input?: Record<string, unknown> }).input ?? {};
 
     if (name === 'PutCommand') {
@@ -44,12 +51,22 @@ const createFakeTable = () => {
     }
 
     if (name === 'ScanCommand') {
-      return { Items: Array.from(items.values()).filter((item) => item.entityType === 'IMPORT') };
+      return {
+        Items: Array.from(items.values()).filter(
+          (item) => item.entityType === 'IMPORT',
+        ),
+      };
     }
 
     if (name === 'QueryCommand') {
-      const pk = (input.ExpressionAttributeValues as Record<string, unknown>)[':pk'] as string;
-      return { Items: Array.from(items.values()).filter((item) => item.pk === pk && item.entityType === 'CHUNK_RESULT') };
+      const pk = (input.ExpressionAttributeValues as Record<string, unknown>)[
+        ':pk'
+      ] as string;
+      return {
+        Items: Array.from(items.values()).filter(
+          (item) => item.pk === pk && item.entityType === 'CHUNK_RESULT',
+        ),
+      };
     }
 
     if (name === 'UpdateCommand') {
@@ -58,15 +75,23 @@ const createFakeTable = () => {
       const existing = items.get(itemKey);
 
       if (!existing) {
-        throw new ConditionalCheckFailedException({ message: 'The conditional request failed', $metadata: {} });
+        throw new ConditionalCheckFailedException({
+          message: 'The conditional request failed',
+          $metadata: {},
+        });
       }
 
       if ((input.UpdateExpression as string).startsWith('ADD ')) {
-        const increment = (input.ExpressionAttributeValues as Record<string, number>)[':increment'] ?? 0;
+        const increment =
+          (input.ExpressionAttributeValues as Record<string, number>)[
+            ':increment'
+          ] ?? 0;
         const updated = {
           ...existing,
           processedChunks: Number(existing.processedChunks ?? 0) + increment,
-          updatedAt: (input.ExpressionAttributeValues as Record<string, unknown>)[':updatedAt'],
+          updatedAt: (
+            input.ExpressionAttributeValues as Record<string, unknown>
+          )[':updatedAt'],
         };
         items.set(itemKey, updated);
         return { Attributes: { processedChunks: updated.processedChunks } };
@@ -90,7 +115,10 @@ const createFakeTable = () => {
 describe('adapter coverage', () => {
   it('covers AWS client wiring and dependency factories', () => {
     const baseClients = createAwsClients({ region: 'us-east-1' });
-    const localClients = createAwsClients({ region: 'us-east-1', endpoint: 'http://localhost:4566' });
+    const localClients = createAwsClients({
+      region: 'us-east-1',
+      endpoint: 'http://localhost:4566',
+    });
 
     expect(baseClients.s3).toBeDefined();
     expect(localClients.s3).toBeDefined();
@@ -122,7 +150,8 @@ describe('adapter coverage', () => {
 
   it('covers S3 object storage branches', async () => {
     const send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
 
       if (name === 'PutObjectCommand') {
         return {};
@@ -133,11 +162,18 @@ describe('adapter coverage', () => {
         const key = input?.Key ?? '';
 
         if (key === 'string.csv') {
-          return { Body: 'string-body', ContentType: 'text/csv', Metadata: { importId: 'import-1' } };
+          return {
+            Body: 'string-body',
+            ContentType: 'text/csv',
+            Metadata: { importId: 'import-1' },
+          };
         }
 
         if (key === 'bytes.csv') {
-          return { Body: new Uint8Array(Buffer.from('bytes-body')), ContentType: 'text/csv' };
+          return {
+            Body: new Uint8Array(Buffer.from('bytes-body')),
+            ContentType: 'text/csv',
+          };
         }
 
         if (key === 'stream.csv') {
@@ -168,18 +204,43 @@ describe('adapter coverage', () => {
     });
 
     const storage = new S3ObjectStorage({ send } as never, 'bucket-a');
-    await storage.putObject({ bucket: 'bucket-a', key: 'incoming/file.csv', body: 'csv', contentType: 'text/csv', metadata: { importId: 'import-1' } });
+    await storage.putObject({
+      bucket: 'bucket-a',
+      key: 'incoming/file.csv',
+      body: 'csv',
+      contentType: 'text/csv',
+      metadata: { importId: 'import-1' },
+    });
     expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
-    expect(await storage.getObject('bucket-a', 'string.csv')).toMatchObject({ body: 'string-body' });
-    expect(await storage.getObject('bucket-a', 'bytes.csv')).toMatchObject({ body: 'bytes-body' });
-    expect(await storage.getObject('bucket-a', 'stream.csv')).toMatchObject({ body: 'stream-body', contentType: 'application/octet-stream' });
-    expect(await storage.getObject('bucket-a', 'string-stream.csv')).toMatchObject({ body: 'string-stream-body', contentType: 'application/octet-stream' });
+    expect(await storage.getObject('bucket-a', 'string.csv')).toMatchObject({
+      body: 'string-body',
+    });
+    expect(await storage.getObject('bucket-a', 'bytes.csv')).toMatchObject({
+      body: 'bytes-body',
+    });
+    expect(await storage.getObject('bucket-a', 'stream.csv')).toMatchObject({
+      body: 'stream-body',
+      contentType: 'application/octet-stream',
+    });
+    expect(
+      await storage.getObject('bucket-a', 'string-stream.csv'),
+    ).toMatchObject({
+      body: 'string-stream-body',
+      contentType: 'application/octet-stream',
+    });
     expect(await storage.getObject('bucket-a', 'empty.csv')).toBeUndefined();
     expect(await storage.getObject('bucket-a', 'invalid.csv')).toBeUndefined();
     await storage.moveObject('bucket-a', 'string.csv', 'bucket-a', 'moved.csv');
     await storage.moveObject('bucket-a', 'bytes.csv', 'bucket-b', 'copied.csv');
-    await storage.moveObject('bucket-a', 'missing.csv', 'bucket-b', 'missing-copy.csv');
-    expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([expect.objectContaining({ key: 'processed/file.csv' })]);
+    await storage.moveObject(
+      'bucket-a',
+      'missing.csv',
+      'bucket-b',
+      'missing-copy.csv',
+    );
+    expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([
+      expect.objectContaining({ key: 'processed/file.csv' }),
+    ]);
     expect(await storage.listObjects('bucket-a', 'missing/')).toEqual([]);
     expect(buildObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');
   });
@@ -211,10 +272,18 @@ describe('adapter coverage', () => {
     expect(await store.getImport('import-1')).toEqual(importRecord);
     expect(await store.listImports()).toEqual([importRecord]);
     expect(await store.getImport('missing')).toBeUndefined();
-    expect(await store.updateImport('missing', { status: 'FAILED' })).toBeUndefined();
+    expect(
+      await store.updateImport('missing', { status: 'FAILED' }),
+    ).toBeUndefined();
 
-    const updatedImport = await store.updateImport('import-1', { status: 'PROCESSING', processedChunks: 1 });
-    expect(updatedImport).toMatchObject({ status: 'PROCESSING', processedChunks: 1 });
+    const updatedImport = await store.updateImport('import-1', {
+      status: 'PROCESSING',
+      processedChunks: 1,
+    });
+    expect(updatedImport).toMatchObject({
+      status: 'PROCESSING',
+      processedChunks: 1,
+    });
 
     const compactImport: ImportRecord = {
       id: 'import-2',
@@ -235,7 +304,10 @@ describe('adapter coverage', () => {
     };
 
     await store.saveImport(compactImport);
-    expect(await store.getImport('import-2')).toMatchObject({ id: 'import-2', filename: 'compact.csv' });
+    expect(await store.getImport('import-2')).toMatchObject({
+      id: 'import-2',
+      filename: 'compact.csv',
+    });
 
     const firstSave = await store.saveChunkResult({
       importId: 'import-1',
@@ -292,7 +364,8 @@ describe('adapter coverage', () => {
 
   it('propagates unexpected updateImport errors instead of swallowing them', async () => {
     const send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
       if (name === 'UpdateCommand') {
         throw new Error('network blip');
       }
@@ -300,7 +373,9 @@ describe('adapter coverage', () => {
     });
 
     const store = new DynamoDbImportStore({ send } as never, 'imports-table');
-    await expect(store.updateImport('import-1', { status: 'FAILED' })).rejects.toThrow('network blip');
+    await expect(
+      store.updateImport('import-1', { status: 'FAILED' }),
+    ).rejects.toThrow('network blip');
   });
 
   it('defaults incrementProcessedChunks to 0 when DynamoDB returns no attributes', async () => {
@@ -311,7 +386,8 @@ describe('adapter coverage', () => {
 
   it('covers DynamoDB defaults and empty responses', async () => {
     const send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
 
       if (name === 'GetCommand') {
         return {
@@ -363,7 +439,8 @@ describe('adapter coverage', () => {
 
   it('covers DynamoDB empty arrays explicitly', async () => {
     const send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
 
       if (name === 'ScanCommand') {
         return { Items: [] };
@@ -384,14 +461,12 @@ describe('adapter coverage', () => {
 
   it('covers DynamoDB chunk fallbacks', async () => {
     const send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
 
       if (name === 'QueryCommand') {
         return {
-          Items: [
-            {
-            },
-          ],
+          Items: [{}],
         };
       }
 

@@ -1,9 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
-import { mapCsvRowsToCustomerRecords, parseCsvText, splitCsvIntoChunks } from '../shared/csv.js';
+import {
+  mapCsvRowsToCustomerRecords,
+  parseCsvText,
+  splitCsvIntoChunks,
+} from '../shared/csv.js';
 
 describe('csv helpers', () => {
   it('splits csv into chunked files', () => {
-    const csv = ['customerId,name,email,cpf,age', '1,Alice,alice@example.com,52998224725,30', '2,Bob,bob@example.com,12345678909,40'].join('\n');
+    const csv = [
+      'customerId,name,email,cpf,age',
+      '1,Alice,alice@example.com,52998224725,30',
+      '2,Bob,bob@example.com,12345678909,40',
+    ].join('\n');
 
     const chunks = splitCsvIntoChunks(csv, 1);
 
@@ -12,7 +20,10 @@ describe('csv helpers', () => {
   });
 
   it('parses csv rows into objects', () => {
-    const csv = ['customerId,name,email,cpf,age', '1,Alice,alice@example.com,52998224725,30'].join('\n');
+    const csv = [
+      'customerId,name,email,cpf,age',
+      '1,Alice,alice@example.com,52998224725,30',
+    ].join('\n');
 
     const rows = parseCsvText(csv);
 
@@ -28,7 +39,10 @@ describe('csv helpers', () => {
   });
 
   it('handles escaped quotes and missing fields', () => {
-    const csv = ['customerId,name,email,cpf,age', '1,"Alice ""Ace"" Smith",alice@example.com,52998224725'].join('\n');
+    const csv = [
+      'customerId,name,email,cpf,age',
+      '1,"Alice ""Ace"" Smith",alice@example.com,52998224725',
+    ].join('\n');
 
     expect(parseCsvText(csv)).toEqual([
       {
@@ -62,8 +76,20 @@ describe('csv helpers', () => {
     const rows = parseCsvText(csv);
 
     expect(rows).toEqual([
-      { customerId: '1', name: 'Alice', notes: 'Line one\nLine two', cpf: '52998224725', age: '30' },
-      { customerId: '2', name: 'Bob', notes: 'plain notes', cpf: '12345678909', age: '40' },
+      {
+        customerId: '1',
+        name: 'Alice',
+        notes: 'Line one\nLine two',
+        cpf: '52998224725',
+        age: '30',
+      },
+      {
+        customerId: '2',
+        name: 'Bob',
+        notes: 'plain notes',
+        cpf: '12345678909',
+        age: '40',
+      },
     ]);
 
     const chunks = splitCsvIntoChunks(csv, 1);

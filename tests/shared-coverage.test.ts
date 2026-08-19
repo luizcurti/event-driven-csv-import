@@ -1,10 +1,17 @@
 import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { type S3Client as AwsS3Client } from '@aws-sdk/client-s3';
 import { createAwsClients } from '../shared/aws-clients.js';
 import { loadConfig } from '../shared/config.js';
-import { createDependencies, createAwsDependencies } from '../shared/dependencies.js';
+import {
+  createDependencies,
+  createAwsDependencies,
+} from '../shared/dependencies.js';
 import {
   AppError,
   ChunkProcessingException,
@@ -15,11 +22,21 @@ import {
 } from '../shared/errors.js';
 import { createEvent, createId } from '../shared/events.js';
 import { Logger, createLogger } from '../shared/logger.js';
-import { InMemoryObjectStorage, buildObjectKey } from '../shared/object-storage.js';
+import {
+  InMemoryObjectStorage,
+  buildObjectKey,
+} from '../shared/object-storage.js';
 import { InMemoryImportStore } from '../shared/repository.js';
 import { S3ObjectStorage } from '../shared/s3-object-storage.js';
-import { parseCsvText, splitCsvIntoChunks, mapCsvRowsToCustomerRecords } from '../shared/csv.js';
-import { validateCustomerRecord, validateUploadFile } from '../shared/validation.js';
+import {
+  parseCsvText,
+  splitCsvIntoChunks,
+  mapCsvRowsToCustomerRecords,
+} from '../shared/csv.js';
+import {
+  validateCustomerRecord,
+  validateUploadFile,
+} from '../shared/validation.js';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -58,8 +75,16 @@ describe('shared coverage', () => {
 
   it('creates ids, errors, and event envelopes', () => {
     const id = createId();
-    const event = createEvent('FileUploaded', 'correlation-1', 'import-1', { ok: true });
-    const customSourceEvent = createEvent('ChunkCompleted', 'correlation-2', 'import-2', { chunkNumber: 1 }, 'custom');
+    const event = createEvent('FileUploaded', 'correlation-1', 'import-1', {
+      ok: true,
+    });
+    const customSourceEvent = createEvent(
+      'ChunkCompleted',
+      'correlation-2',
+      'import-2',
+      { chunkNumber: 1 },
+      'custom',
+    );
     const defaultError = new AppError('generic', 'GENERIC');
 
     expect(id).toMatch(/^[0-9a-f-]{36}$/iu);
@@ -81,20 +106,50 @@ describe('shared coverage', () => {
       new ImportNotFoundException(),
       new StorageException(),
     ]).toEqual([
-      expect.objectContaining({ name: 'AppError', code: 'GENERIC', statusCode: 418 }),
-      expect.objectContaining({ name: 'InvalidFileException', code: 'INVALID_FILE', statusCode: 400 }),
-      expect.objectContaining({ name: 'ValidationException', code: 'VALIDATION_ERROR', statusCode: 400 }),
-      expect.objectContaining({ name: 'ChunkProcessingException', code: 'CHUNK_PROCESSING_ERROR', statusCode: 500 }),
-      expect.objectContaining({ name: 'ImportNotFoundException', code: 'IMPORT_NOT_FOUND', statusCode: 404 }),
-      expect.objectContaining({ name: 'StorageException', code: 'STORAGE_ERROR', statusCode: 500 }),
+      expect.objectContaining({
+        name: 'AppError',
+        code: 'GENERIC',
+        statusCode: 418,
+      }),
+      expect.objectContaining({
+        name: 'InvalidFileException',
+        code: 'INVALID_FILE',
+        statusCode: 400,
+      }),
+      expect.objectContaining({
+        name: 'ValidationException',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      }),
+      expect.objectContaining({
+        name: 'ChunkProcessingException',
+        code: 'CHUNK_PROCESSING_ERROR',
+        statusCode: 500,
+      }),
+      expect.objectContaining({
+        name: 'ImportNotFoundException',
+        code: 'IMPORT_NOT_FOUND',
+        statusCode: 404,
+      }),
+      expect.objectContaining({
+        name: 'StorageException',
+        code: 'STORAGE_ERROR',
+        statusCode: 500,
+      }),
     ]);
     expect(defaultError).toMatchObject({ code: 'GENERIC', statusCode: 500 });
   });
 
   it('logs structured payloads and merges child context', () => {
-    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const infoSpy = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
 
     const logger = createLogger('app', { service: 'ingestion' });
     const plainLogger = createLogger('plain');
@@ -156,7 +211,8 @@ describe('shared coverage', () => {
   });
 
   it('handles csv parsing, chunking, mapping, and validation', () => {
-    const csv = 'customerId,name,email,cpf,age\r\n1,"Alice, A.",alice@example.com,52998224725,30\r\n2,Bob,bob@example.com,12345678909,40';
+    const csv =
+      'customerId,name,email,cpf,age\r\n1,"Alice, A.",alice@example.com,52998224725,30\r\n2,Bob,bob@example.com,12345678909,40';
     const quotedCsv = 'customerId,name\n1,"Alice ""Ace"" Smith"';
 
     expect(parseCsvText('')).toEqual([]);
@@ -177,14 +233,30 @@ describe('shared coverage', () => {
         age: '40',
       },
     ]);
-    expect(parseCsvText(quotedCsv)).toEqual([{ customerId: '1', name: 'Alice "Ace" Smith' }]);
+    expect(parseCsvText(quotedCsv)).toEqual([
+      { customerId: '1', name: 'Alice "Ace" Smith' },
+    ]);
 
     expect(splitCsvIntoChunks('', 10)).toEqual([]);
     expect(splitCsvIntoChunks('customerId,name', 10)).toEqual([]);
     expect(splitCsvIntoChunks(csv, 1)).toHaveLength(2);
 
-    expect(mapCsvRowsToCustomerRecords([{ customer_id: '1', name: 'Alice', email: 'alice@example.com', cpf: '52998224725', age: '30' }])).toEqual([
-      expect.objectContaining({ customerId: '1', name: 'Alice', status: 'VALID' }),
+    expect(
+      mapCsvRowsToCustomerRecords([
+        {
+          customer_id: '1',
+          name: 'Alice',
+          email: 'alice@example.com',
+          cpf: '52998224725',
+          age: '30',
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        customerId: '1',
+        name: 'Alice',
+        status: 'VALID',
+      }),
     ]);
 
     expect(
@@ -232,14 +304,26 @@ describe('shared coverage', () => {
         age: 30,
         status: 'VALID',
       }),
-    ).toEqual([
-      expect.objectContaining({ field: 'cpf' }),
-    ]);
+    ).toEqual([expect.objectContaining({ field: 'cpf' })]);
 
-    expect(() => validateUploadFile('customers.csv', 'text/csv', 10, ['text/csv'], 100)).not.toThrow();
-    expect(() => validateUploadFile('customers.txt', 'text/csv', 10, ['text/csv'], 100)).toThrow('Only CSV files are accepted.');
-    expect(() => validateUploadFile('customers.csv', 'application/json', 10, ['text/csv'], 100)).toThrow('Unsupported file content type.');
-    expect(() => validateUploadFile('customers.csv', 'text/csv', 101, ['text/csv'], 100)).toThrow('File size exceeds the configured limit.');
+    expect(() =>
+      validateUploadFile('customers.csv', 'text/csv', 10, ['text/csv'], 100),
+    ).not.toThrow();
+    expect(() =>
+      validateUploadFile('customers.txt', 'text/csv', 10, ['text/csv'], 100),
+    ).toThrow('Only CSV files are accepted.');
+    expect(() =>
+      validateUploadFile(
+        'customers.csv',
+        'application/json',
+        10,
+        ['text/csv'],
+        100,
+      ),
+    ).toThrow('Unsupported file content type.');
+    expect(() =>
+      validateUploadFile('customers.csv', 'text/csv', 101, ['text/csv'], 100),
+    ).toThrow('File size exceeds the configured limit.');
   });
 
   it('keeps objects and records in memory', async () => {
@@ -252,13 +336,24 @@ describe('shared coverage', () => {
       metadata: { importId: 'import-1' },
     });
 
-    expect(await storage.getObject('bucket-a', 'incoming/file.csv')).toMatchObject({
+    expect(
+      await storage.getObject('bucket-a', 'incoming/file.csv'),
+    ).toMatchObject({
       body: 'hello',
       metadata: { importId: 'import-1' },
     });
-    await storage.moveObject('bucket-a', 'incoming/file.csv', 'bucket-a', 'processed/file.csv');
-    expect(await storage.getObject('bucket-a', 'incoming/file.csv')).toBeUndefined();
-    expect(await storage.getObject('bucket-a', 'processed/file.csv')).toMatchObject({
+    await storage.moveObject(
+      'bucket-a',
+      'incoming/file.csv',
+      'bucket-a',
+      'processed/file.csv',
+    );
+    expect(
+      await storage.getObject('bucket-a', 'incoming/file.csv'),
+    ).toBeUndefined();
+    expect(
+      await storage.getObject('bucket-a', 'processed/file.csv'),
+    ).toMatchObject({
       body: 'hello',
       metadata: { importId: 'import-1' },
     });
@@ -270,11 +365,23 @@ describe('shared coverage', () => {
       body: 'plain',
       contentType: 'text/csv',
     });
-    await storage.moveObject('bucket-a', 'incoming/plain.csv', 'bucket-a', 'processed/plain.csv');
-    expect(await storage.getObject('bucket-a', 'processed/plain.csv')).toMatchObject({
+    await storage.moveObject(
+      'bucket-a',
+      'incoming/plain.csv',
+      'bucket-a',
+      'processed/plain.csv',
+    );
+    expect(
+      await storage.getObject('bucket-a', 'processed/plain.csv'),
+    ).toMatchObject({
       body: 'plain',
     });
-    await storage.moveObject('bucket-a', 'missing.csv', 'bucket-a', 'still-missing.csv');
+    await storage.moveObject(
+      'bucket-a',
+      'missing.csv',
+      'bucket-a',
+      'still-missing.csv',
+    );
 
     const store = new InMemoryImportStore();
     const now = new Date().toISOString();
@@ -299,7 +406,9 @@ describe('shared coverage', () => {
     await store.saveImport(record);
     expect(await store.getImport('import-1')).toEqual(record);
     expect(await store.listImports()).toEqual([record]);
-    expect(await store.updateImport('missing', { status: 'FAILED' })).toBeUndefined();
+    expect(
+      await store.updateImport('missing', { status: 'FAILED' }),
+    ).toBeUndefined();
     expect(await store.listChunkResults('missing')).toEqual([]);
     await store.saveChunkResult({
       importId: 'import-1',
@@ -334,12 +443,17 @@ describe('shared coverage', () => {
 
     expect(await store.incrementProcessedChunks('import-1')).toBe(1);
     expect(await store.incrementProcessedChunks('import-1')).toBe(2);
-    await expect(store.incrementProcessedChunks('missing')).rejects.toThrow('Import "missing" not found.');
+    await expect(store.incrementProcessedChunks('missing')).rejects.toThrow(
+      'Import "missing" not found.',
+    );
   });
 
   it('covers aws client and adapter branches', async () => {
     const baseClients = createAwsClients({ region: 'us-east-1' });
-    const localClients = createAwsClients({ region: 'us-east-1', endpoint: 'http://localhost:4566' });
+    const localClients = createAwsClients({
+      region: 'us-east-1',
+      endpoint: 'http://localhost:4566',
+    });
 
     expect(baseClients.s3).toBeInstanceOf(S3Client);
     expect(localClients.s3).toBeInstanceOf(S3Client);
@@ -353,9 +467,17 @@ describe('shared coverage', () => {
     const defaultAwsDependencies = createAwsDependencies();
     expect(defaultAwsDependencies.logger).toBeDefined();
 
-    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    createAwsDependencies({}, { IMPORTS_BUCKET: 'imports-bucket' }, 'worker').logger.info('scoped');
-    expect(JSON.parse(infoSpy.mock.calls[0]?.[0] as string)).toMatchObject({ scope: 'worker' });
+    const infoSpy = jest
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+    createAwsDependencies(
+      {},
+      { IMPORTS_BUCKET: 'imports-bucket' },
+      'worker',
+    ).logger.info('scoped');
+    expect(JSON.parse(infoSpy.mock.calls[0]?.[0] as string)).toMatchObject({
+      scope: 'worker',
+    });
     infoSpy.mockRestore();
 
     const endpointFallbackDependencies = createAwsDependencies(
@@ -435,10 +557,15 @@ describe('shared coverage', () => {
     expect(overriddenAwsDependencies.storage).toBe(customStorage);
 
     const moveSend = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
 
       if (name === 'GetObjectCommand') {
-        return { Body: 'move-body', ContentType: 'text/csv', Metadata: { importId: 'import-1' } };
+        return {
+          Body: 'move-body',
+          ContentType: 'text/csv',
+          Metadata: { importId: 'import-1' },
+        };
       }
 
       if (name === 'PutObjectCommand') {
@@ -448,13 +575,22 @@ describe('shared coverage', () => {
       return {};
     });
 
-    const moveStorage = new S3ObjectStorage({ send: moveSend } as unknown as AwsS3Client, 'bucket-a');
-    await moveStorage.moveObject('bucket-a', 'source.csv', 'bucket-b', 'target.csv');
+    const moveStorage = new S3ObjectStorage(
+      { send: moveSend } as unknown as AwsS3Client,
+      'bucket-a',
+    );
+    await moveStorage.moveObject(
+      'bucket-a',
+      'source.csv',
+      'bucket-b',
+      'target.csv',
+    );
     expect(moveSend).toHaveBeenCalledWith(expect.any(GetObjectCommand));
     expect(moveSend).toHaveBeenCalledWith(expect.any(PutObjectCommand));
 
     const s3Send = jest.fn(async (command: unknown) => {
-      const name = (command as { constructor?: { name?: string } }).constructor?.name;
+      const name = (command as { constructor?: { name?: string } }).constructor
+        ?.name;
 
       if (name === 'PutObjectCommand') {
         return {};
@@ -465,11 +601,18 @@ describe('shared coverage', () => {
         const key = input?.Key ?? '';
 
         if (key === 'string.csv') {
-          return { Body: 'string-body', ContentType: 'text/csv', Metadata: { importId: 'import-1' } };
+          return {
+            Body: 'string-body',
+            ContentType: 'text/csv',
+            Metadata: { importId: 'import-1' },
+          };
         }
 
         if (key === 'bytes.csv') {
-          return { Body: new Uint8Array(Buffer.from('bytes-body')), ContentType: 'text/csv' };
+          return {
+            Body: new Uint8Array(Buffer.from('bytes-body')),
+            ContentType: 'text/csv',
+          };
         }
 
         if (key === 'stream.csv') {
@@ -495,15 +638,34 @@ describe('shared coverage', () => {
       return {};
     });
 
-    const storage = new S3ObjectStorage({ send: s3Send } as unknown as AwsS3Client, 'bucket-a');
-    await storage.putObject({ bucket: 'bucket-a', key: 'incoming/file.csv', body: 'csv', contentType: 'text/csv', metadata: { importId: 'import-1' } });
-    expect(await storage.getObject('bucket-a', 'string.csv')).toMatchObject({ body: 'string-body', metadata: { importId: 'import-1' } });
-    expect(await storage.getObject('bucket-a', 'bytes.csv')).toMatchObject({ body: 'bytes-body' });
-    expect(await storage.getObject('bucket-a', 'stream.csv')).toMatchObject({ body: 'stream-body', contentType: 'application/octet-stream' });
+    const storage = new S3ObjectStorage(
+      { send: s3Send } as unknown as AwsS3Client,
+      'bucket-a',
+    );
+    await storage.putObject({
+      bucket: 'bucket-a',
+      key: 'incoming/file.csv',
+      body: 'csv',
+      contentType: 'text/csv',
+      metadata: { importId: 'import-1' },
+    });
+    expect(await storage.getObject('bucket-a', 'string.csv')).toMatchObject({
+      body: 'string-body',
+      metadata: { importId: 'import-1' },
+    });
+    expect(await storage.getObject('bucket-a', 'bytes.csv')).toMatchObject({
+      body: 'bytes-body',
+    });
+    expect(await storage.getObject('bucket-a', 'stream.csv')).toMatchObject({
+      body: 'stream-body',
+      contentType: 'application/octet-stream',
+    });
     expect(await storage.getObject('bucket-a', 'empty.csv')).toBeUndefined();
     expect(await storage.getObject('bucket-a', 'invalid.csv')).toBeUndefined();
     await storage.moveObject('bucket-a', 'string.csv', 'bucket-a', 'moved.csv');
-    expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([expect.objectContaining({ key: 'processed/file.csv' })]);
+    expect(await storage.listObjects('bucket-a', 'processed/')).toEqual([
+      expect.objectContaining({ key: 'processed/file.csv' }),
+    ]);
     expect(await storage.listObjects('bucket-a')).toEqual([]);
     expect(await storage.listObjects('bucket-a', 'missing/')).toEqual([]);
     expect(buildObjectKey('bucket-a', 'key.csv')).toBe('bucket-a/key.csv');

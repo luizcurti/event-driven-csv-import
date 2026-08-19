@@ -26,7 +26,10 @@ export const createAggregatorHandler = ({ logger, store }: AppDependencies) => {
     // done" — it must not finalize a status while chunks are still
     // outstanding, even if it gets invoked early (a race between concurrent
     // Workers) or replayed after the fact.
-    if (currentImport.totalChunks === 0 || chunkResults.length < currentImport.totalChunks) {
+    if (
+      currentImport.totalChunks === 0 ||
+      chunkResults.length < currentImport.totalChunks
+    ) {
       logger.warn('Aggregation skipped: import still has pending chunks', {
         importId,
         totalChunks: currentImport.totalChunks,
@@ -45,12 +48,27 @@ export const createAggregatorHandler = ({ logger, store }: AppDependencies) => {
       };
     }
 
-    const processedRecords = chunkResults.reduce((sum, result) => sum + result.recordsProcessed, 0);
-    const successRecords = chunkResults.reduce((sum, result) => sum + result.successRecords, 0);
-    const failedRecords = chunkResults.reduce((sum, result) => sum + result.failedRecords, 0);
+    const processedRecords = chunkResults.reduce(
+      (sum, result) => sum + result.recordsProcessed,
+      0,
+    );
+    const successRecords = chunkResults.reduce(
+      (sum, result) => sum + result.successRecords,
+      0,
+    );
+    const failedRecords = chunkResults.reduce(
+      (sum, result) => sum + result.failedRecords,
+      0,
+    );
     const processedChunks = chunkResults.length;
-    const completedStatus = failedRecords === 0 ? 'COMPLETED' : successRecords === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
-    const executionTimeMs = Date.now() - new Date(currentImport.createdAt).getTime();
+    const completedStatus =
+      failedRecords === 0
+        ? 'COMPLETED'
+        : successRecords === 0
+          ? 'FAILED'
+          : 'PARTIAL_SUCCESS';
+    const executionTimeMs =
+      Date.now() - new Date(currentImport.createdAt).getTime();
 
     await store.updateImport(importId, {
       status: completedStatus,

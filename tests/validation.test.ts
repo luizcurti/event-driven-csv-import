@@ -44,9 +44,7 @@ describe('customer validation', () => {
     });
 
     expect(issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ field: 'cpf' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ field: 'cpf' })]),
     );
   });
 

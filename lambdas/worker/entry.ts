@@ -2,7 +2,10 @@ import type { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import type { LambdaClient } from '@aws-sdk/client-lambda';
 import { InvokeCommand } from '@aws-sdk/client-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
-import { createAwsDependencies, resolveAwsClients } from '../../shared/dependencies.js';
+import {
+  createAwsDependencies,
+  resolveAwsClients,
+} from '../../shared/dependencies.js';
 import { withMetrics } from '../../shared/metrics.js';
 import { createWorkerHandler } from './handler.js';
 import type { ChunkMessage } from '../../shared/types.js';
@@ -19,7 +22,11 @@ export const createWorkerEntryHandler = (
 ) => {
   const workerHandler = createWorkerHandler(dependencies);
 
-  const maybeInvokeAggregator = async (importId: string, processedChunks: number, totalChunks: number): Promise<void> => {
+  const maybeInvokeAggregator = async (
+    importId: string,
+    processedChunks: number,
+    totalChunks: number,
+  ): Promise<void> => {
     if (!aggregatorFunctionName || processedChunks < totalChunks) {
       return;
     }
@@ -46,7 +53,11 @@ export const createWorkerEntryHandler = (
         // increment, not a snapshot another Worker could have already moved
         // past — so only the Worker that truly finishes the last chunk
         // invokes the Aggregator.
-        await maybeInvokeAggregator(message.importId, workerResult.processedChunks, message.totalChunks);
+        await maybeInvokeAggregator(
+          message.importId,
+          workerResult.processedChunks,
+          message.totalChunks,
+        );
       } catch {
         batchItemFailures.push({ itemIdentifier: record.messageId });
       }
@@ -59,5 +70,9 @@ export const createWorkerEntryHandler = (
 const awsClients = resolveAwsClients();
 export const handler = withMetrics(
   'worker',
-  createWorkerEntryHandler(createAwsDependencies({}, process.env, 'worker'), awsClients.lambda, process.env.AGGREGATOR_FUNCTION_NAME ?? ''),
+  createWorkerEntryHandler(
+    createAwsDependencies({}, process.env, 'worker'),
+    awsClients.lambda,
+    process.env.AGGREGATOR_FUNCTION_NAME ?? '',
+  ),
 );

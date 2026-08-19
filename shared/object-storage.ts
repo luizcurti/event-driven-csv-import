@@ -9,26 +9,48 @@ export interface StoredObject {
 }
 
 export interface ObjectStorage {
-  putObject(object: Omit<StoredObject, 'createdAt' | 'updatedAt'>): Promise<void>;
+  putObject(
+    object: Omit<StoredObject, 'createdAt' | 'updatedAt'>,
+  ): Promise<void>;
   getObject(bucket: string, key: string): Promise<StoredObject | undefined>;
-  moveObject(sourceBucket: string, sourceKey: string, targetBucket: string, targetKey: string): Promise<void>;
+  moveObject(
+    sourceBucket: string,
+    sourceKey: string,
+    targetBucket: string,
+    targetKey: string,
+  ): Promise<void>;
 }
 
-export const buildObjectKey = (bucket: string, key: string): string => `${bucket}/${key}`;
+export const buildObjectKey = (bucket: string, key: string): string =>
+  `${bucket}/${key}`;
 
 export class InMemoryObjectStorage implements ObjectStorage {
   private readonly objects = new Map<string, StoredObject>();
 
-  async putObject(object: Omit<StoredObject, 'createdAt' | 'updatedAt'>): Promise<void> {
+  async putObject(
+    object: Omit<StoredObject, 'createdAt' | 'updatedAt'>,
+  ): Promise<void> {
     const now = new Date().toISOString();
-    this.objects.set(buildObjectKey(object.bucket, object.key), { ...object, createdAt: now, updatedAt: now });
+    this.objects.set(buildObjectKey(object.bucket, object.key), {
+      ...object,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
-  async getObject(bucket: string, key: string): Promise<StoredObject | undefined> {
+  async getObject(
+    bucket: string,
+    key: string,
+  ): Promise<StoredObject | undefined> {
     return this.objects.get(buildObjectKey(bucket, key));
   }
 
-  async moveObject(sourceBucket: string, sourceKey: string, targetBucket: string, targetKey: string): Promise<void> {
+  async moveObject(
+    sourceBucket: string,
+    sourceKey: string,
+    targetBucket: string,
+    targetKey: string,
+  ): Promise<void> {
     const current = await this.getObject(sourceBucket, sourceKey);
     if (!current) {
       return;

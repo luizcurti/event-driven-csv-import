@@ -1,7 +1,13 @@
-import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyStructuredResultV2,
+} from 'aws-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { createId } from '../../shared/events.js';
-import { InvalidFileException, ValidationException } from '../../shared/errors.js';
+import {
+  InvalidFileException,
+  ValidationException,
+} from '../../shared/errors.js';
 import { validateUploadFile } from '../../shared/validation.js';
 import { toJsonResponse } from '../../shared/http.js';
 import type { ImportRecord } from '../../shared/types.js';
@@ -12,12 +18,20 @@ interface UploadedFile {
   body: string;
 }
 
-const getHeader = (headers: Record<string, string | undefined>, name: string): string | undefined => {
+const getHeader = (
+  headers: Record<string, string | undefined>,
+  name: string,
+): string | undefined => {
   const targetName = name.toLowerCase();
-  return Object.entries(headers).find(([key]) => key.toLowerCase() === targetName)?.[1];
+  return Object.entries(headers).find(
+    ([key]) => key.toLowerCase() === targetName,
+  )?.[1];
 };
 
-const parseMultipartFile = (body: string, contentType: string): UploadedFile => {
+const parseMultipartFile = (
+  body: string,
+  contentType: string,
+): UploadedFile => {
   const boundaryMatch = /boundary=([^;]+)/iu.exec(contentType);
 
   if (!boundaryMatch) {
@@ -25,7 +39,10 @@ const parseMultipartFile = (body: string, contentType: string): UploadedFile => 
   }
 
   const boundary = `--${boundaryMatch[1]}`;
-  const parts = body.split(boundary).map((part) => part.trim()).filter((part) => part && part !== '--');
+  const parts = body
+    .split(boundary)
+    .map((part) => part.trim())
+    .filter((part) => part && part !== '--');
 
   for (const part of parts) {
     const [rawHeaders, ...rawBodyParts] = part.split('\r\n\r\n');
@@ -34,14 +51,23 @@ const parseMultipartFile = (body: string, contentType: string): UploadedFile => 
     }
 
     const headers = rawHeaders.split('\r\n');
-    const disposition = headers.find((line) => line.toLowerCase().startsWith('content-disposition'));
+    const disposition = headers.find((line) =>
+      line.toLowerCase().startsWith('content-disposition'),
+    );
     if (!disposition || !disposition.includes('name="file"')) {
       continue;
     }
 
     const fileNameMatch = /filename="([^"]+)"/iu.exec(disposition);
-    const partContentType = headers.find((line) => line.toLowerCase().startsWith('content-type'))?.split(':')[1]?.trim() ?? 'text/csv';
-    const rawContent = rawBodyParts.join('\r\n\r\n').replace(/\r\n--$/u, '').trim();
+    const partContentType =
+      headers
+        .find((line) => line.toLowerCase().startsWith('content-type'))
+        ?.split(':')[1]
+        ?.trim() ?? 'text/csv';
+    const rawContent = rawBodyParts
+      .join('\r\n\r\n')
+      .replace(/\r\n--$/u, '')
+      .trim();
 
     return {
       fileName: fileNameMatch?.[1] ?? 'import.csv',
@@ -54,15 +80,22 @@ const parseMultipartFile = (body: string, contentType: string): UploadedFile => 
 };
 
 const parseUploadInput = (event: APIGatewayProxyEventV2): UploadedFile => {
-  const contentType = getHeader(event.headers, 'content-type') ?? 'application/json';
-  const body = event.isBase64Encoded ? Buffer.from(event.body ?? '', 'base64').toString('utf8') : event.body ?? '';
+  const contentType =
+    getHeader(event.headers, 'content-type') ?? 'application/json';
+  const body = event.isBase64Encoded
+    ? Buffer.from(event.body ?? '', 'base64').toString('utf8')
+    : (event.body ?? '');
 
   if (contentType.includes('multipart/form-data')) {
     return parseMultipartFile(body, contentType);
   }
 
   try {
-    const payload = JSON.parse(body) as { fileName?: unknown; contentType?: unknown; body?: unknown };
+    const payload = JSON.parse(body) as {
+      fileName?: unknown;
+      contentType?: unknown;
+      body?: unknown;
+    };
 
     if (
       typeof payload.fileName !== 'string' ||
@@ -78,13 +111,23 @@ const parseUploadInput = (event: APIGatewayProxyEventV2): UploadedFile => {
       body: payload.body,
     };
   } catch {
-    throw new ValidationException('Upload payload must be multipart/form-data or a valid JSON envelope.');
+    throw new ValidationException(
+      'Upload payload must be multipart/form-data or a valid JSON envelope.',
+    );
   }
 };
 
-export const createUploadHandler = ({ config, logger, store, storage }: AppDependencies) => {
-  return async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> => {
-    const correlationId = getHeader(event.headers, 'x-correlation-id') ?? createId();
+export const createUploadHandler = ({
+  config,
+  logger,
+  store,
+  storage,
+}: AppDependencies) => {
+  return async (
+    event: APIGatewayProxyEventV2,
+  ): Promise<APIGatewayProxyStructuredResultV2> => {
+    const correlationId =
+      getHeader(event.headers, 'x-correlation-id') ?? createId();
     const uploadedFile = parseUploadInput(event);
     const sizeBytes = Buffer.byteLength(uploadedFile.body, 'utf8');
 

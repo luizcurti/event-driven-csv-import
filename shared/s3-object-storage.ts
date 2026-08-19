@@ -1,4 +1,10 @@
-import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type PutObjectCommandInput, type S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  type PutObjectCommandInput,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { Readable } from 'node:stream';
 import type { ObjectStorage, StoredObject } from './object-storage.js';
 
@@ -34,7 +40,9 @@ export class S3ObjectStorage implements ObjectStorage {
     private readonly bucket: string,
   ) {}
 
-  async putObject(object: Omit<StoredObject, 'createdAt' | 'updatedAt'>): Promise<void> {
+  async putObject(
+    object: Omit<StoredObject, 'createdAt' | 'updatedAt'>,
+  ): Promise<void> {
     const input: PutObjectCommandInput = {
       Bucket: object.bucket,
       Key: object.key,
@@ -49,7 +57,10 @@ export class S3ObjectStorage implements ObjectStorage {
     await this.client.send(new PutObjectCommand(input));
   }
 
-  async getObject(bucket: string, key: string): Promise<StoredObject | undefined> {
+  async getObject(
+    bucket: string,
+    key: string,
+  ): Promise<StoredObject | undefined> {
     try {
       const response = await this.client.send(
         new GetObjectCommand({
@@ -81,7 +92,12 @@ export class S3ObjectStorage implements ObjectStorage {
     }
   }
 
-  async moveObject(sourceBucket: string, sourceKey: string, targetBucket: string, targetKey: string): Promise<void> {
+  async moveObject(
+    sourceBucket: string,
+    sourceKey: string,
+    targetBucket: string,
+    targetKey: string,
+  ): Promise<void> {
     const current = await this.getObject(sourceBucket, sourceKey);
     if (!current) {
       return;

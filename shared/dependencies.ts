@@ -13,7 +13,9 @@ export interface AppDependencies {
   storage: ObjectStorage;
 }
 
-export const createDependencies = (overrides: Partial<AppDependencies> = {}): AppDependencies => ({
+export const createDependencies = (
+  overrides: Partial<AppDependencies> = {},
+): AppDependencies => ({
   config: overrides.config ?? loadConfig(),
   logger: overrides.logger ?? createLogger('app'),
   store: overrides.store ?? new InMemoryImportStore(),
@@ -36,10 +38,14 @@ const resolveEndpoint = (env: NodeJS.ProcessEnv): string | undefined => {
   return undefined;
 };
 
-export const resolveAwsClients = (env: NodeJS.ProcessEnv = process.env): AwsClients => {
+export const resolveAwsClients = (
+  env: NodeJS.ProcessEnv = process.env,
+): AwsClients => {
   const endpoint = resolveEndpoint(env);
   const region = env.AWS_REGION ?? 'us-east-1';
-  return endpoint ? createAwsClients({ region, endpoint }) : createAwsClients({ region });
+  return endpoint
+    ? createAwsClients({ region, endpoint })
+    : createAwsClients({ region });
 };
 
 export const createAwsDependencies = (
@@ -54,8 +60,13 @@ export const createAwsDependencies = (
 
   return {
     config,
-    logger: overrides.logger ?? createLogger(serviceName, { mode: endpoint ? 'localstack' : 'aws' }),
-    store: overrides.store ?? new DynamoDbImportStore(clients.dynamoDb, tableName),
-    storage: overrides.storage ?? new S3ObjectStorage(clients.s3, config.importsBucket),
+    logger:
+      overrides.logger ??
+      createLogger(serviceName, { mode: endpoint ? 'localstack' : 'aws' }),
+    store:
+      overrides.store ?? new DynamoDbImportStore(clients.dynamoDb, tableName),
+    storage:
+      overrides.storage ??
+      new S3ObjectStorage(clients.s3, config.importsBucket),
   };
 };

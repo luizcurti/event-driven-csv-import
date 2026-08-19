@@ -9,25 +9,39 @@ export interface SplitResult {
   messages: ChunkMessage[];
 }
 
-export const createSplitHandler = ({ config, logger, store, storage }: AppDependencies) => {
+export const createSplitHandler = ({
+  config,
+  logger,
+  store,
+  storage,
+}: AppDependencies) => {
   return async (importId: string): Promise<SplitResult> => {
     const currentImport = await store.getImport(importId);
     if (!currentImport) {
       throw new ImportNotFoundException();
     }
 
-    const object = await storage.getObject(currentImport.bucket, currentImport.key);
+    const object = await storage.getObject(
+      currentImport.bucket,
+      currentImport.key,
+    );
     if (!object) {
       throw new ImportNotFoundException('Source CSV not found in storage.');
     }
 
-    const chunks = splitCsvIntoChunks(object.body, currentImport.chunkSize ?? config.chunkSize);
+    const chunks = splitCsvIntoChunks(
+      object.body,
+      currentImport.chunkSize ?? config.chunkSize,
+    );
     const messages: ChunkMessage[] = [];
 
     await store.updateImport(importId, {
       status: 'SPLITTING',
       totalChunks: chunks.length,
-      totalRecords: Math.max(chunks.reduce((sum, chunk) => sum + chunk.records, 0), 0),
+      totalRecords: Math.max(
+        chunks.reduce((sum, chunk) => sum + chunk.records, 0),
+        0,
+      ),
     } satisfies Partial<ImportRecord>);
 
     for (const chunk of chunks) {

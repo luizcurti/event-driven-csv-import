@@ -20,7 +20,9 @@ export interface AwsClients {
   lambda: LambdaClient;
 }
 
-const createSharedConfig = (options: AwsClientOptions): {
+const createSharedConfig = (
+  options: AwsClientOptions,
+): {
   endpoint?: string;
   credentials?: { accessKeyId: string; secretAccessKey: string };
 } => {

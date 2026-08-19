@@ -30,7 +30,9 @@ export const withMetrics = <Event, Result>(
   env: NodeJS.ProcessEnv = process.env,
 ): ((event: Event) => Promise<Result>) => {
   const pushgatewayUrl = env.PUSHGATEWAY_URL;
-  const pushgateway = pushgatewayUrl ? new Pushgateway(pushgatewayUrl, {}, registry) : undefined;
+  const pushgateway = pushgatewayUrl
+    ? new Pushgateway(pushgatewayUrl, {}, registry)
+    : undefined;
 
   return async (event: Event): Promise<Result> => {
     const startedAt = process.hrtime.bigint();

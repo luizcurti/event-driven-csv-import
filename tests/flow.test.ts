@@ -28,18 +28,25 @@ describe('import flow', () => {
       body: JSON.stringify({
         fileName: 'customers.csv',
         contentType: 'text/csv',
-        body: ['customerId,name,email,cpf,age', '1,Alice,alice@example.com,52998224725,30'].join('\n'),
+        body: [
+          'customerId,name,email,cpf,age',
+          '1,Alice,alice@example.com,52998224725,30',
+        ].join('\n'),
       }),
     });
 
     expect(uploadResponse.statusCode).toBe(201);
 
-    const uploadBody = JSON.parse(uploadResponse.body ?? '{}') as { importId: string };
+    const uploadBody = JSON.parse(uploadResponse.body ?? '{}') as {
+      importId: string;
+    };
     const splitResult = await splitHandler(uploadBody.importId);
 
     expect(splitResult.totalChunks).toBe(1);
 
-    await workerHandler(splitResult.messages[0] as (typeof splitResult.messages)[number]);
+    await workerHandler(
+      splitResult.messages[0] as (typeof splitResult.messages)[number],
+    );
     const aggregation = await aggregatorHandler(uploadBody.importId);
     const status = await statusHandler(uploadBody.importId);
 

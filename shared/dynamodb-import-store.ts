@@ -24,7 +24,8 @@ type ChunkTableItem = ChunkResult & {
 
 const importPk = (id: string): string => `IMPORT#${id}`;
 const importSk = 'META';
-const chunkSk = (chunkNumber: number): string => `CHUNK#${String(chunkNumber).padStart(6, '0')}`;
+const chunkSk = (chunkNumber: number): string =>
+  `CHUNK#${String(chunkNumber).padStart(6, '0')}`;
 
 const toImportItem = (record: ImportRecord): ImportTableItem => ({
   ...record,
@@ -67,7 +68,9 @@ const fromImportItem = (item: Record<string, unknown>): ImportRecord => {
 };
 
 const fromChunkItem = (item: Record<string, unknown>): ChunkResult => ({
-  importId: String(item.importId ?? String(item.pk ?? '').replace(/^IMPORT#/, '')),
+  importId: String(
+    item.importId ?? String(item.pk ?? '').replace(/^IMPORT#/, ''),
+  ),
   chunkNumber: Number(item.chunkNumber ?? 0),
   workerId: String(item.workerId ?? ''),
   requestId: String(item.requestId ?? ''),
@@ -133,8 +136,14 @@ export class DynamoDbImportStore implements ImportStore {
    * `updateImport`) land between our read and write and get silently
    * overwritten by our stale copy of the item.
    */
-  async updateImport(id: string, patch: Partial<ImportRecord>): Promise<ImportRecord | undefined> {
-    const entries = Object.entries({ ...patch, updatedAt: new Date().toISOString() });
+  async updateImport(
+    id: string,
+    patch: Partial<ImportRecord>,
+  ): Promise<ImportRecord | undefined> {
+    const entries = Object.entries({
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    });
 
     const expressionAttributeNames: Record<string, string> = {};
     const expressionAttributeValues: Record<string, unknown> = {};
@@ -211,7 +220,9 @@ export class DynamoDbImportStore implements ImportStore {
       }),
     );
 
-    return (response.Items ?? []).map(fromChunkItem).sort((left, right) => left.chunkNumber - right.chunkNumber);
+    return (response.Items ?? [])
+      .map(fromChunkItem)
+      .sort((left, right) => left.chunkNumber - right.chunkNumber);
   }
 
   /**
@@ -224,7 +235,8 @@ export class DynamoDbImportStore implements ImportStore {
       new UpdateCommand({
         TableName: this.tableName,
         Key: { pk: importPk(importId), sk: importSk },
-        UpdateExpression: 'ADD processedChunks :increment SET updatedAt = :updatedAt',
+        UpdateExpression:
+          'ADD processedChunks :increment SET updatedAt = :updatedAt',
         ExpressionAttributeValues: {
           ':increment': 1,
           ':updatedAt': new Date().toISOString(),

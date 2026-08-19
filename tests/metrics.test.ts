@@ -10,7 +10,8 @@ const listen = (server: Server): Promise<number> =>
     });
   });
 
-const closeServer = (server: Server): Promise<void> => new Promise((resolve) => server.close(() => resolve()));
+const closeServer = (server: Server): Promise<void> =>
+  new Promise((resolve) => server.close(() => resolve()));
 
 describe('withMetrics', () => {
   afterEach(() => {
@@ -18,7 +19,11 @@ describe('withMetrics', () => {
   });
 
   it('records a successful invocation without pushing when PUSHGATEWAY_URL is unset', async () => {
-    const handler = withMetrics('upload', async (event: { value: number }) => event.value * 2, {});
+    const handler = withMetrics(
+      'upload',
+      async (event: { value: number }) => event.value * 2,
+      {},
+    );
     await expect(handler({ value: 2 })).resolves.toBe(4);
   });
 
@@ -39,7 +44,9 @@ describe('withMetrics', () => {
     });
     const port = await listen(server);
 
-    const handler = withMetrics('upload', async () => 'ok', { PUSHGATEWAY_URL: `http://127.0.0.1:${port}` });
+    const handler = withMetrics('upload', async () => 'ok', {
+      PUSHGATEWAY_URL: `http://127.0.0.1:${port}`,
+    });
     await expect(handler(undefined)).resolves.toBe('ok');
     await closeServer(server);
 
@@ -47,12 +54,19 @@ describe('withMetrics', () => {
   });
 
   it('logs a warning and does not throw when the push itself fails', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const handler = withMetrics('upload', async () => 'ok', { PUSHGATEWAY_URL: 'http://127.0.0.1:1' });
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const handler = withMetrics('upload', async () => 'ok', {
+      PUSHGATEWAY_URL: 'http://127.0.0.1:1',
+    });
 
     await expect(handler(undefined)).resolves.toBe('ok');
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(warnSpy.mock.calls[0]?.[0] as string)).toMatchObject({ level: 'warn', functionName: 'upload' });
+    expect(JSON.parse(warnSpy.mock.calls[0]?.[0] as string)).toMatchObject({
+      level: 'warn',
+      functionName: 'upload',
+    });
   });
 
   it('records the error outcome and rethrows when the handler fails', async () => {
@@ -68,7 +82,9 @@ describe('withMetrics', () => {
   });
 
   it('still pushes metrics and rethrows when the handler fails with a pushgateway configured', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
     const handler = withMetrics(
       'worker',
       async () => {

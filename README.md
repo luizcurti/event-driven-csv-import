@@ -31,8 +31,9 @@ The system simulates an asynchronous ingestion pipeline with upload, split, para
 1. Install dependencies with `npm install`.
 2. Run `npm run typecheck` to validate TypeScript.
 3. Run `npm run lint` to check code style.
-4. Run `npm run test:coverage` to run the unit suite with 100% coverage enforcement.
-5. Run `npm run test:localstack` to execute the end-to-end flow against LocalStack.
+4. Run `npm run format` to check Prettier formatting (`npm run format:fix` to apply it).
+5. Run `npm run test:coverage` to run the unit suite with 100% coverage enforcement.
+6. Run `npm run test:localstack` to execute the end-to-end flow against LocalStack.
 
 ## LocalStack
 
@@ -74,16 +75,15 @@ The Postman collection in `postman/event-driven-csv-import.postman_collection.js
 
 ## Verification
 
-The project is verified with:
+CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 
-- 100% unit test coverage
-- LocalStack end-to-end testing
-- Terraform init, format, validation, and plan checks
+- Typecheck (`npm run typecheck`)
+- Lint (`npm run lint`)
+- Unit tests with 100% coverage enforcement (`npm run test:coverage`)
+- Terraform formatting check (`terraform fmt -check -recursive`)
 
-## Architecture Notes
+The following checks are not wired into CI and must be run locally before relying on them:
 
-- Code and documentation are written in English.
-- TypeScript is strict.
-- Logging is centralized and structured.
-- Shared models and contracts reduce coupling.
-- The in-memory implementations keep tests and local development fast.
+- Prettier formatting (`npm run format`)
+- Terraform init, validation, and plan (`npm run terraform:init` / `terraform:validate` / `terraform:plan`)
+- LocalStack end-to-end testing (`npm run local:up` then `npm run test:localstack`)

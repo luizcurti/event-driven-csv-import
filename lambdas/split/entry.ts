@@ -1,7 +1,10 @@
 import type { SQSClient } from '@aws-sdk/client-sqs';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import type { AppDependencies } from '../../shared/dependencies.js';
-import { createAwsDependencies, resolveAwsClients } from '../../shared/dependencies.js';
+import {
+  createAwsDependencies,
+  resolveAwsClients,
+} from '../../shared/dependencies.js';
 import { withMetrics } from '../../shared/metrics.js';
 import { createSplitHandler, type SplitResult } from './handler.js';
 
@@ -61,5 +64,9 @@ export const createSplitEntryHandler = (
 const awsClients = resolveAwsClients();
 export const handler = withMetrics(
   'split',
-  createSplitEntryHandler(createAwsDependencies({}, process.env, 'split'), awsClients.sqs, process.env.PROCESSING_QUEUE_URL ?? ''),
+  createSplitEntryHandler(
+    createAwsDependencies({}, process.env, 'split'),
+    awsClients.sqs,
+    process.env.PROCESSING_QUEUE_URL ?? '',
+  ),
 );

@@ -13,7 +13,13 @@ export interface AggregatorEntryInput {
  */
 export const createAggregatorEntryHandler = (dependencies: AppDependencies) => {
   const aggregatorHandler = createAggregatorHandler(dependencies);
-  return async (event: AggregatorEntryInput): Promise<AggregationResult> => aggregatorHandler(event.importId);
+  return async (event: AggregatorEntryInput): Promise<AggregationResult> =>
+    aggregatorHandler(event.importId);
 };
 
-export const handler = withMetrics('aggregator', createAggregatorEntryHandler(createAwsDependencies({}, process.env, 'aggregator')));
+export const handler = withMetrics(
+  'aggregator',
+  createAggregatorEntryHandler(
+    createAwsDependencies({}, process.env, 'aggregator'),
+  ),
+);

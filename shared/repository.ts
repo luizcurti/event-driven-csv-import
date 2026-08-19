@@ -8,7 +8,10 @@ export interface ImportStore {
   saveImport(record: ImportRecord): Promise<void>;
   getImport(id: string): Promise<ImportRecord | undefined>;
   listImports(): Promise<ImportRecord[]>;
-  updateImport(id: string, patch: Partial<ImportRecord>): Promise<ImportRecord | undefined>;
+  updateImport(
+    id: string,
+    patch: Partial<ImportRecord>,
+  ): Promise<ImportRecord | undefined>;
   saveChunkResult(result: ChunkResult): Promise<SaveChunkResultOutcome>;
   listChunkResults(importId: string): Promise<ChunkResult[]>;
   /**
@@ -38,7 +41,10 @@ export class InMemoryImportStore implements ImportStore {
     return Array.from(this.imports.values()).map((record) => ({ ...record }));
   }
 
-  async updateImport(id: string, patch: Partial<ImportRecord>): Promise<ImportRecord | undefined> {
+  async updateImport(
+    id: string,
+    patch: Partial<ImportRecord>,
+  ): Promise<ImportRecord | undefined> {
     const current = this.imports.get(id);
     if (!current) {
       return undefined;
@@ -56,8 +62,12 @@ export class InMemoryImportStore implements ImportStore {
 
   async saveChunkResult(result: ChunkResult): Promise<SaveChunkResultOutcome> {
     const results = this.chunkResults.get(result.importId) ?? [];
-    const isNewChunk = !results.some((current) => current.chunkNumber === result.chunkNumber);
-    const filtered = results.filter((current) => current.chunkNumber !== result.chunkNumber);
+    const isNewChunk = !results.some(
+      (current) => current.chunkNumber === result.chunkNumber,
+    );
+    const filtered = results.filter(
+      (current) => current.chunkNumber !== result.chunkNumber,
+    );
     filtered.push({ ...result });
     filtered.sort((left, right) => left.chunkNumber - right.chunkNumber);
     this.chunkResults.set(result.importId, filtered);
@@ -65,7 +75,9 @@ export class InMemoryImportStore implements ImportStore {
   }
 
   async listChunkResults(importId: string): Promise<ChunkResult[]> {
-    return (this.chunkResults.get(importId) ?? []).map((result) => ({ ...result }));
+    return (this.chunkResults.get(importId) ?? []).map((result) => ({
+      ...result,
+    }));
   }
 
   async incrementProcessedChunks(importId: string): Promise<number> {

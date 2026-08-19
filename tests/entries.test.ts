@@ -56,11 +56,15 @@ describe('lambda entry adapters', () => {
     await dependencies.store.saveImport(baseImport());
     const handler = createStatusEntryHandler(dependencies);
 
-    const single = await handler({ pathParameters: { id: 'import-1' } } as never);
+    const single = await handler({
+      pathParameters: { id: 'import-1' },
+    } as never);
     expect(JSON.parse(single.body ?? '{}')).toMatchObject({ id: 'import-1' });
 
     const list = await handler({ pathParameters: null } as never);
-    expect(JSON.parse(list.body ?? '{}')).toMatchObject({ items: [expect.objectContaining({ id: 'import-1' })] });
+    expect(JSON.parse(list.body ?? '{}')).toMatchObject({
+      items: [expect.objectContaining({ id: 'import-1' })],
+    });
   });
 
   it('converts a thrown AppError into a proper HTTP error response instead of a raw Lambda error', async () => {
@@ -74,17 +78,23 @@ describe('lambda entry adapters', () => {
     } as never);
 
     expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body ?? '{}')).toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(JSON.parse(response.body ?? '{}')).toMatchObject({
+      code: 'VALIDATION_ERROR',
+    });
   });
 
   it('converts a thrown AppError from the status handler into a 404 response', async () => {
     const dependencies = createDependencies();
     const handler = createStatusEntryHandler(dependencies);
 
-    const response = await handler({ pathParameters: { id: 'missing-import' } } as never);
+    const response = await handler({
+      pathParameters: { id: 'missing-import' },
+    } as never);
 
     expect(response.statusCode).toBe(404);
-    expect(JSON.parse(response.body ?? '{}')).toMatchObject({ code: 'IMPORT_NOT_FOUND' });
+    expect(JSON.parse(response.body ?? '{}')).toMatchObject({
+      code: 'IMPORT_NOT_FOUND',
+    });
   });
 
   it('rejects an invalid file upload with 400/INVALID_FILE instead of a generic 500', async () => {
@@ -102,7 +112,9 @@ describe('lambda entry adapters', () => {
     } as never);
 
     expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body ?? '{}')).toMatchObject({ code: 'INVALID_FILE' });
+    expect(JSON.parse(response.body ?? '{}')).toMatchObject({
+      code: 'INVALID_FILE',
+    });
   });
 
   it('converts an unexpected non-AppError thrown by the upload handler into a generic 500 response', async () => {
@@ -113,7 +125,10 @@ describe('lambda entry adapters', () => {
         throw new Error('unexpected failure');
       },
     };
-    const handler = createUploadEntryHandler({ ...dependencies, store: brokenStore } as never);
+    const handler = createUploadEntryHandler({
+      ...dependencies,
+      store: brokenStore,
+    } as never);
 
     const response = await handler({
       headers: { 'content-type': 'application/json' },
@@ -126,14 +141,18 @@ describe('lambda entry adapters', () => {
     } as never);
 
     expect(response.statusCode).toBe(500);
-    expect(JSON.parse(response.body ?? '{}')).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(JSON.parse(response.body ?? '{}')).toMatchObject({
+      code: 'INTERNAL_ERROR',
+    });
   });
 
   it('splits a CSV and enqueues one SQS message per chunk, resolving importId from event.importId', async () => {
     const dependencies = createDependencies();
-    const csv = ['customerId,name,email,cpf,age', '1,Alice,alice@example.com,52998224725,30', '2,Bob,bob@example.com,12345678909,40'].join(
-      '\n',
-    );
+    const csv = [
+      'customerId,name,email,cpf,age',
+      '1,Alice,alice@example.com,52998224725,30',
+      '2,Bob,bob@example.com,12345678909,40',
+    ].join('\n');
     await dependencies.storage.putObject({
       bucket: 'bucket-a',
       key: 'incoming/import-1/file.csv',
@@ -143,7 +162,11 @@ describe('lambda entry adapters', () => {
     await dependencies.store.saveImport(baseImport({ chunkSize: 1 }));
 
     const send = jest.fn(async () => ({}));
-    const handler = createSplitEntryHandler(dependencies, { send } as never, 'https://queue.example/processing');
+    const handler = createSplitEntryHandler(
+      dependencies,
+      { send } as never,
+      'https://queue.example/processing',
+    );
 
     const result = await handler({ importId: 'import-1' });
 
@@ -163,19 +186,33 @@ describe('lambda entry adapters', () => {
     await dependencies.store.saveImport(baseImport());
 
     const send = jest.fn(async () => ({}));
-    const handler = createSplitEntryHandler(dependencies, { send } as never, 'https://queue.example/processing');
+    const handler = createSplitEntryHandler(
+      dependencies,
+      { send } as never,
+      'https://queue.example/processing',
+    );
 
-    const result = await handler({ detail: { object: { key: 'incoming/import-1/file.csv' } } });
+    const result = await handler({
+      detail: { object: { key: 'incoming/import-1/file.csv' } },
+    });
     expect(result.importId).toBe('import-1');
 
     await expect(
-      createSplitEntryHandler(dependencies, { send } as never, 'https://queue.example/processing')({
+      createSplitEntryHandler(
+        dependencies,
+        { send } as never,
+        'https://queue.example/processing',
+      )({
         detail: { object: { key: '' } },
       }),
     ).rejects.toThrow('Unable to extract importId');
 
     await expect(
-      createSplitEntryHandler(dependencies, { send } as never, 'https://queue.example/processing')({}),
+      createSplitEntryHandler(
+        dependencies,
+        { send } as never,
+        'https://queue.example/processing',
+      )({}),
     ).rejects.toThrow('Unable to extract importId');
   });
 
@@ -199,7 +236,11 @@ describe('lambda entry adapters', () => {
     };
 
     const send = jest.fn(async () => ({}));
-    const handler = createWorkerEntryHandler(dependencies, { send } as never, '');
+    const handler = createWorkerEntryHandler(
+      dependencies,
+      { send } as never,
+      '',
+    );
 
     const result = await handler({
       Records: [
@@ -232,9 +273,15 @@ describe('lambda entry adapters', () => {
     };
 
     const send = jest.fn(async () => ({}));
-    const handler = createWorkerEntryHandler(dependencies, { send } as never, 'aggregator-function');
+    const handler = createWorkerEntryHandler(
+      dependencies,
+      { send } as never,
+      'aggregator-function',
+    );
 
-    await handler({ Records: [{ messageId: 'msg-1', body: JSON.stringify(message) } as never] });
+    await handler({
+      Records: [{ messageId: 'msg-1', body: JSON.stringify(message) } as never],
+    });
 
     expect(send).toHaveBeenCalledWith(expect.any(InvokeCommand));
   });
@@ -259,9 +306,15 @@ describe('lambda entry adapters', () => {
     };
 
     const send = jest.fn(async () => ({}));
-    const handler = createWorkerEntryHandler(dependencies, { send } as never, 'aggregator-function');
+    const handler = createWorkerEntryHandler(
+      dependencies,
+      { send } as never,
+      'aggregator-function',
+    );
 
-    await handler({ Records: [{ messageId: 'msg-1', body: JSON.stringify(message) } as never] });
+    await handler({
+      Records: [{ messageId: 'msg-1', body: JSON.stringify(message) } as never],
+    });
 
     expect(send).not.toHaveBeenCalled();
   });

@@ -1,4 +1,8 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyEventV2, APIGatewayProxyResult } from 'aws-lambda';
+import type {
+  APIGatewayProxyEvent,
+  APIGatewayProxyEventV2,
+  APIGatewayProxyResult,
+} from 'aws-lambda';
 import type { AppDependencies } from '../../shared/dependencies.js';
 import { createAwsDependencies } from '../../shared/dependencies.js';
 import { runRestHandler } from '../../shared/http.js';
@@ -15,7 +19,12 @@ export const createUploadEntryHandler = (dependencies: AppDependencies) => {
   const uploadHandler = createUploadHandler(dependencies);
 
   return async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> =>
-    runRestHandler(() => uploadHandler(event as unknown as APIGatewayProxyEventV2));
+    runRestHandler(() =>
+      uploadHandler(event as unknown as APIGatewayProxyEventV2),
+    );
 };
 
-export const handler = withMetrics('upload', createUploadEntryHandler(createAwsDependencies({}, process.env, 'upload')));
+export const handler = withMetrics(
+  'upload',
+  createUploadEntryHandler(createAwsDependencies({}, process.env, 'upload')),
+);

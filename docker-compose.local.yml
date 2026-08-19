@@ -3,7 +3,7 @@ services:
     image: localstack/localstack:4.1.1
     container_name: document-processing-localstack
     ports:
-      - "4566:4566"
+      - '4566:4566'
     environment:
       - SERVICES=s3,dynamodb,sqs,sns,lambda,events,stepfunctions,cloudwatch,logs,iam,kms,sts,apigateway
       - AWS_DEFAULT_REGION=us-east-1
@@ -24,7 +24,7 @@ services:
     image: prom/pushgateway:v1.9.0
     container_name: document-processing-pushgateway
     ports:
-      - "9091:9091"
+      - '9091:9091'
     networks:
       - observability
 
@@ -32,7 +32,7 @@ services:
     image: prom/prometheus:v2.54.1
     container_name: document-processing-prometheus
     ports:
-      - "9090:9090"
+      - '9090:9090'
     volumes:
       - ./local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -46,7 +46,7 @@ services:
     container_name: document-processing-loki
     command: -config.file=/etc/loki/loki-config.yml
     ports:
-      - "3100:3100"
+      - '3100:3100'
     volumes:
       - ./local/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki-data:/loki
@@ -70,7 +70,7 @@ services:
     image: grafana/grafana:11.2.0
     container_name: document-processing-grafana
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

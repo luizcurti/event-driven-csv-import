@@ -37,9 +37,17 @@ export class Logger {
     };
 
     const output = JSON.stringify(payload);
-    const emit = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
+    const emit =
+      level === 'error'
+        ? console.error
+        : level === 'warn'
+          ? console.warn
+          : console.info;
     emit(output);
   }
 }
 
-export const createLogger = (scope: string, baseContext: LogContext = {}): Logger => new Logger(scope, baseContext);
+export const createLogger = (
+  scope: string,
+  baseContext: LogContext = {},
+): Logger => new Logger(scope, baseContext);

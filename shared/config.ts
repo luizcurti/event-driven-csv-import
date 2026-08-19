@@ -23,11 +23,17 @@ const parseList = (value: string | undefined, fallback: string[]): string[] => {
     .filter(Boolean);
 };
 
-export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => ({
+export const loadConfig = (
+  env: NodeJS.ProcessEnv = process.env,
+): AppConfig => ({
   environment: env.NODE_ENV ?? 'development',
   importsBucket: env.IMPORTS_BUCKET ?? 'event-driven-data-ingestion',
   chunkSize: parseNumber(env.CHUNK_SIZE, 5000),
   maxFileSizeBytes: parseNumber(env.MAX_FILE_SIZE_BYTES, 50 * 1024 * 1024),
-  allowedMimeTypes: parseList(env.ALLOWED_MIME_TYPES, ['text/csv', 'application/csv', 'text/plain']),
+  allowedMimeTypes: parseList(env.ALLOWED_MIME_TYPES, [
+    'text/csv',
+    'application/csv',
+    'text/plain',
+  ]),
   workerConcurrency: parseNumber(env.WORKER_CONCURRENCY, 10),
 });

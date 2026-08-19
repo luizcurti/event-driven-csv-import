@@ -16,4 +16,7 @@ export const createStatusEntryHandler = (dependencies: AppDependencies) => {
     runRestHandler(() => statusHandler(event.pathParameters?.id));
 };
 
-export const handler = withMetrics('status', createStatusEntryHandler(createAwsDependencies({}, process.env, 'status')));
+export const handler = withMetrics(
+  'status',
+  createStatusEntryHandler(createAwsDependencies({}, process.env, 'status')),
+);

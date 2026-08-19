@@ -1,12 +1,25 @@
-import { CreateBucketCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { CreateTableCommand, DescribeTableCommand, DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import {
+  CreateBucketCommand,
+  HeadBucketCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import {
+  CreateTableCommand,
+  DescribeTableCommand,
+  DynamoDBClient,
+} from '@aws-sdk/client-dynamodb';
 import {
   CreateEventBusCommand,
   DescribeEventBusCommand,
   EventBridgeClient,
   PutEventsCommand,
 } from '@aws-sdk/client-eventbridge';
-import { CreateQueueCommand, GetQueueUrlCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import {
+  CreateQueueCommand,
+  GetQueueUrlCommand,
+  SendMessageCommand,
+  SQSClient,
+} from '@aws-sdk/client-sqs';
 import {
   CreateStateMachineCommand,
   ListStateMachinesCommand,
@@ -22,17 +35,26 @@ import { createWorkerHandler } from '../lambdas/worker/handler.js';
 import { createAggregatorHandler } from '../lambdas/aggregator/handler.js';
 import { createStatusHandler } from '../lambdas/status/handler.js';
 
-const endpoint = process.env.LOCALSTACK_ENDPOINT ?? process.env.AWS_ENDPOINT_URL;
+const endpoint =
+  process.env.LOCALSTACK_ENDPOINT ?? process.env.AWS_ENDPOINT_URL;
 const suite = endpoint ? describe : describe.skip;
 
 const region = process.env.AWS_REGION ?? 'us-east-1';
-const bucketName = process.env.IMPORTS_BUCKET ?? 'event-driven-data-ingestion-local';
-const tableName = process.env.IMPORTS_TABLE_NAME ?? 'event-driven-data-ingestion-local-imports';
-const queueName = process.env.PROCESSING_QUEUE_NAME ?? 'event-driven-data-ingestion-local-processing';
-const busName = process.env.EVENT_BUS_NAME ?? 'event-driven-data-ingestion-local-bus';
-const stateMachineName = process.env.STATE_MACHINE_NAME ?? 'event-driven-data-ingestion-local-orchestration';
+const bucketName =
+  process.env.IMPORTS_BUCKET ?? 'event-driven-data-ingestion-local';
+const tableName =
+  process.env.IMPORTS_TABLE_NAME ?? 'event-driven-data-ingestion-local-imports';
+const queueName =
+  process.env.PROCESSING_QUEUE_NAME ??
+  'event-driven-data-ingestion-local-processing';
+const busName =
+  process.env.EVENT_BUS_NAME ?? 'event-driven-data-ingestion-local-bus';
+const stateMachineName =
+  process.env.STATE_MACHINE_NAME ??
+  'event-driven-data-ingestion-local-orchestration';
 const stepFunctionsRoleArn =
-  process.env.STEP_FUNCTIONS_ROLE_ARN ?? 'arn:aws:iam::000000000000:role/service-role/stepfunctions-local';
+  process.env.STEP_FUNCTIONS_ROLE_ARN ??
+  'arn:aws:iam::000000000000:role/service-role/stepfunctions-local';
 
 const stateMachineDefinition = JSON.stringify({
   StartAt: 'Done',
@@ -78,10 +100,14 @@ const ensureTable = async (client: DynamoDBClient): Promise<void> => {
 
 const ensureQueue = async (client: SQSClient): Promise<string> => {
   try {
-    const current = await client.send(new GetQueueUrlCommand({ QueueName: queueName }));
+    const current = await client.send(
+      new GetQueueUrlCommand({ QueueName: queueName }),
+    );
     return current.QueueUrl ?? '';
   } catch {
-    const created = await client.send(new CreateQueueCommand({ QueueName: queueName }));
+    const created = await client.send(
+      new CreateQueueCommand({ QueueName: queueName }),
+    );
     return created.QueueUrl ?? '';
   }
 };
@@ -96,7 +122,9 @@ const ensureEventBus = async (client: EventBridgeClient): Promise<void> => {
 
 const ensureStateMachine = async (client: SFNClient): Promise<string> => {
   const current = await client.send(new ListStateMachinesCommand({}));
-  const existing = current.stateMachines?.find((stateMachine) => stateMachine.name === stateMachineName);
+  const existing = current.stateMachines?.find(
+    (stateMachine) => stateMachine.name === stateMachineName,
+  );
 
   if (existing?.stateMachineArn) {
     return existing.stateMachineArn;
@@ -127,7 +155,13 @@ suite('localstack integration flow', () => {
 
     clients = createAwsClients({ region, endpoint });
     await ensureBucket(clients.s3);
-    await ensureTable(new DynamoDBClient({ region, endpoint, credentials: { accessKeyId: 'test', secretAccessKey: 'test' } }));
+    await ensureTable(
+      new DynamoDBClient({
+        region,
+        endpoint,
+        credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+      }),
+    );
     queueUrl = await ensureQueue(clients.sqs);
     await ensureEventBus(clients.eventBridge);
     stateMachineArn = await ensureStateMachine(clients.stepFunctions);
@@ -161,13 +195,18 @@ suite('localstack integration flow', () => {
       body: JSON.stringify({
         fileName: 'customers.csv',
         contentType: 'text/csv',
-        body: ['customerId,name,email,cpf,age', '1,Alice,alice@example.com,52998224725,30'].join('\n'),
+        body: [
+          'customerId,name,email,cpf,age',
+          '1,Alice,alice@example.com,52998224725,30',
+        ].join('\n'),
       }),
     });
 
     expect(uploadResponse.statusCode).toBe(201);
 
-    const { importId } = JSON.parse(uploadResponse.body ?? '{}') as { importId: string };
+    const { importId } = JSON.parse(uploadResponse.body ?? '{}') as {
+      importId: string;
+    };
     await clients.eventBridge.send(
       new PutEventsCommand({
         Entries: [

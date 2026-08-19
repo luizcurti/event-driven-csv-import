@@ -6,7 +6,8 @@ export interface CsvChunk {
   records: number;
 }
 
-const normalizeLineEndings = (value: string): string => value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+const normalizeLineEndings = (value: string): string =>
+  value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
 // Quote-aware: a plain `split('\n')` would break a row apart wherever a
 // quoted field (e.g. an address or notes column) contains a literal
@@ -73,7 +74,9 @@ const parseCsvRow = (line: string): string[] => {
   return values;
 };
 
-export const parseCsvText = (csvText: string): Array<Record<string, string>> => {
+export const parseCsvText = (
+  csvText: string,
+): Array<Record<string, string>> => {
   const rows = splitCsvRows(csvText);
 
   if (rows.length < 2) {
@@ -85,14 +88,20 @@ export const parseCsvText = (csvText: string): Array<Record<string, string>> => 
 
   return dataRows.map((row) => {
     const values = parseCsvRow(row);
-    return headers.reduce<Record<string, string>>((accumulator, header, index) => {
-      accumulator[header] = values[index] ?? '';
-      return accumulator;
-    }, {});
+    return headers.reduce<Record<string, string>>(
+      (accumulator, header, index) => {
+        accumulator[header] = values[index] ?? '';
+        return accumulator;
+      },
+      {},
+    );
   });
 };
 
-export const splitCsvIntoChunks = (csvText: string, chunkSize: number): CsvChunk[] => {
+export const splitCsvIntoChunks = (
+  csvText: string,
+  chunkSize: number,
+): CsvChunk[] => {
   const rows = splitCsvRows(csvText);
 
   if (rows.length <= 1) {
@@ -115,7 +124,9 @@ export const splitCsvIntoChunks = (csvText: string, chunkSize: number): CsvChunk
   return chunks;
 };
 
-export const mapCsvRowsToCustomerRecords = (rows: Array<Record<string, string>>): CustomerRecord[] =>
+export const mapCsvRowsToCustomerRecords = (
+  rows: Array<Record<string, string>>,
+): CustomerRecord[] =>
   rows.map((row) => ({
     customerId: row.customerId ?? row.customer_id ?? '',
     name: row.name ?? '',

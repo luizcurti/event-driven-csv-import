@@ -3,7 +3,12 @@ import { ChunkProcessingException } from '../../shared/errors.js';
 import { createId } from '../../shared/events.js';
 import { mapCsvRowsToCustomerRecords, parseCsvText } from '../../shared/csv.js';
 import { validateCustomerRecord } from '../../shared/validation.js';
-import type { ChunkMessage, ChunkResult, CustomerRecord, ImportRecord } from '../../shared/types.js';
+import type {
+  ChunkMessage,
+  ChunkResult,
+  CustomerRecord,
+  ImportRecord,
+} from '../../shared/types.js';
 
 export interface WorkerResult {
   importId: string;
@@ -13,7 +18,11 @@ export interface WorkerResult {
   processedChunks: number;
 }
 
-export const createWorkerHandler = ({ logger, store, storage }: AppDependencies) => {
+export const createWorkerHandler = ({
+  logger,
+  store,
+  storage,
+}: AppDependencies) => {
   return async (message: ChunkMessage): Promise<WorkerResult> => {
     const startedAt = Date.now();
     const requestId = createId();
@@ -34,9 +43,16 @@ export const createWorkerHandler = ({ logger, store, storage }: AppDependencies)
       } satisfies CustomerRecord;
     });
 
-    const errors = validatedRecords.filter((record) => record.status === 'INVALID').map((record) => record.customerId);
+    const errors = validatedRecords
+      .filter((record) => record.status === 'INVALID')
+      .map((record) => record.customerId);
     const successRecords = validatedRecords.length - errors.length;
-    const status = errors.length === 0 ? 'COMPLETED' : successRecords > 0 ? 'PARTIAL_SUCCESS' : 'FAILED';
+    const status =
+      errors.length === 0
+        ? 'COMPLETED'
+        : successRecords > 0
+          ? 'PARTIAL_SUCCESS'
+          : 'FAILED';
 
     const result: ChunkResult = {
       importId: message.importId,
@@ -57,12 +73,23 @@ export const createWorkerHandler = ({ logger, store, storage }: AppDependencies)
     // atomic processedChunks counter that gates the Aggregator invocation.
     const { isNewChunk } = await store.saveChunkResult(result);
     const chunkResults = await store.listChunkResults(message.importId);
-    const processedChunks = isNewChunk ? await store.incrementProcessedChunks(message.importId) : chunkResults.length;
+    const processedChunks = isNewChunk
+      ? await store.incrementProcessedChunks(message.importId)
+      : chunkResults.length;
     await store.updateImport(message.importId, {
       status: 'RUNNING',
-      processedRecords: chunkResults.reduce((sum, current) => sum + current.recordsProcessed, 0),
-      successRecords: chunkResults.reduce((sum, current) => sum + current.successRecords, 0),
-      failedRecords: chunkResults.reduce((sum, current) => sum + current.failedRecords, 0),
+      processedRecords: chunkResults.reduce(
+        (sum, current) => sum + current.recordsProcessed,
+        0,
+      ),
+      successRecords: chunkResults.reduce(
+        (sum, current) => sum + current.successRecords,
+        0,
+      ),
+      failedRecords: chunkResults.reduce(
+        (sum, current) => sum + current.failedRecords,
+        0,
+      ),
     } satisfies Partial<ImportRecord>);
 
     logger.info('Chunk processed', {

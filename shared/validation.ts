@@ -16,7 +16,11 @@ const isValidCpf = (value: string): boolean => {
     const sum = cpf
       .slice(0, limit)
       .split('')
-      .reduce((accumulator, digit, index) => accumulator + Number(digit) * (limit + 1 - index), 0);
+      .reduce(
+        (accumulator, digit, index) =>
+          accumulator + Number(digit) * (limit + 1 - index),
+        0,
+      );
     const remainder = (sum * 10) % 11;
     return remainder === 10 ? 0 : remainder;
   };
@@ -27,7 +31,9 @@ const isValidCpf = (value: string): boolean => {
   return firstDigit === Number(cpf[9]) && secondDigit === Number(cpf[10]);
 };
 
-export const validateCustomerRecord = (record: CustomerRecord): ValidationIssue[] => {
+export const validateCustomerRecord = (
+  record: CustomerRecord,
+): ValidationIssue[] => {
   const issues: ValidationIssue[] = [];
 
   if (!record.customerId.trim()) {
