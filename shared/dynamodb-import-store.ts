@@ -40,8 +40,8 @@ const toChunkItem = (result: ChunkResult): ChunkTableItem => ({
   entityType: 'CHUNK_RESULT',
 });
 
-const fromImportItem = (item: Record<string, unknown>): ImportRecord => ({
-  ...{
+const fromImportItem = (item: Record<string, unknown>): ImportRecord => {
+  const record: ImportRecord = {
     id: String(item.id),
     correlationId: String(item.correlationId),
     filename: String(item.filename),
@@ -57,9 +57,14 @@ const fromImportItem = (item: Record<string, unknown>): ImportRecord => ({
     failedRecords: Number(item.failedRecords ?? 0),
     successRecords: Number(item.successRecords ?? 0),
     chunkSize: Number(item.chunkSize ?? 0),
-  },
-  ...(typeof item.executionTimeMs === 'number' ? { executionTimeMs: item.executionTimeMs } : {}),
-});
+  };
+
+  if (typeof item.executionTimeMs === 'number') {
+    record.executionTimeMs = item.executionTimeMs;
+  }
+
+  return record;
+};
 
 const fromChunkItem = (item: Record<string, unknown>): ChunkResult => ({
   importId: String(item.importId ?? String(item.pk ?? '').replace(/^IMPORT#/, '')),

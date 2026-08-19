@@ -1,4 +1,4 @@
-import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import type { APIGatewayProxyResult, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { AppError } from './errors.js';
 
 export const toJsonResponse = (statusCode: number, body: unknown): APIGatewayProxyStructuredResultV2 => ({
@@ -21,4 +21,20 @@ export const toErrorResponse = (error: unknown): APIGatewayProxyStructuredResult
   }
 
   return toJsonResponse(500, { message: 'Internal server error.', code: 'INTERNAL_ERROR' });
+};
+
+/**
+ * Runs a REST Lambda handler and converts its result (or any thrown error) into
+ * a v1 `APIGatewayProxyResult`. Handlers return the v2 `...StructuredResultV2`
+ * shape, which is a structural subset of v1's, so the cast is safe.
+ */
+export const runRestHandler = async (
+  handler: () => Promise<APIGatewayProxyStructuredResultV2>,
+): Promise<APIGatewayProxyResult> => {
+  try {
+    const response = await handler();
+    return response as unknown as APIGatewayProxyResult;
+  } catch (error) {
+    return toErrorResponse(error) as unknown as APIGatewayProxyResult;
+  }
 };

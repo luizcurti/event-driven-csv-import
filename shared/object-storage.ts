@@ -12,7 +12,6 @@ export interface ObjectStorage {
   putObject(object: Omit<StoredObject, 'createdAt' | 'updatedAt'>): Promise<void>;
   getObject(bucket: string, key: string): Promise<StoredObject | undefined>;
   moveObject(sourceBucket: string, sourceKey: string, targetBucket: string, targetKey: string): Promise<void>;
-  listObjects?(bucket: string, prefix?: string): Promise<StoredObject[]>;
 }
 
 export const buildObjectKey = (bucket: string, key: string): string => `${bucket}/${key}`;
