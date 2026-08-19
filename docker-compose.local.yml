@@ -13,7 +13,7 @@ services:
       - PERSISTENCE=1
       # Lets the ephemeral containers LocalStack spins up per Lambda invocation
       # join this network, so they can resolve the pushgateway service by name.
-      - LAMBDA_DOCKER_NETWORK=event-driven-observability
+      - LAMBDA_DOCKER_NETWORK=event-driven-csv-import-observability
     volumes:
       - localstack-data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
@@ -87,7 +87,7 @@ services:
 
 networks:
   observability:
-    name: event-driven-observability
+    name: event-driven-csv-import-observability
 
 volumes:
   localstack-data:
