@@ -1,0 +1,82 @@
+%% Main components/modules — Lambda entrypoints, handlers, and shared library
+flowchart LR
+    subgraph Lambdas["lambdas/*"]
+        direction TB
+        UploadEntry["upload/entry.ts\n(API Gateway REST adapter)"]
+        UploadHandler["upload/handler.ts"]
+        SplitEntry["split/entry.ts\n(EventBridge S3 event adapter)"]
+        SplitHandler["split/handler.ts"]
+        WorkerEntry["worker/entry.ts\n(SQS batch adapter)"]
+        WorkerHandler["worker/handler.ts"]
+        AggregatorEntry["aggregator/entry.ts\n(direct Lambda invoke adapter)"]
+        AggregatorHandler["aggregator/handler.ts"]
+        StatusEntry["status/entry.ts\n(API Gateway REST adapter)"]
+        StatusHandler["status/handler.ts"]
+
+        UploadEntry --> UploadHandler
+        SplitEntry --> SplitHandler
+        WorkerEntry --> WorkerHandler
+        AggregatorEntry --> AggregatorHandler
+        StatusEntry --> StatusHandler
+    end
+
+    subgraph Shared["shared/* (library)"]
+        direction TB
+        Dependencies["dependencies.ts\nwires AppDependencies (config, logger, store, storage)"]
+        Config["config.ts\nenv-driven AppConfig"]
+        Logger["logger.ts\nstructured JSON logs"]
+        Metrics["metrics.ts\nwithMetrics() wrapper -> Pushgateway"]
+        Events["events.ts\nEventEnvelope + createId"]
+        Errors["errors.ts\ndomain exceptions"]
+        Http["http.ts\nrunRestHandler / toJsonResponse"]
+        Validation["validation.ts\nfile + CustomerRecord rules (incl. CPF check)"]
+        Csv["csv.ts\nquote-aware CSV parse/split/chunk"]
+        Repository["repository.ts\nImportStore interface + InMemoryImportStore"]
+        DynamoStore["dynamodb-import-store.ts\nDynamoDbImportStore"]
+        ObjectStorage["object-storage.ts\nObjectStorage interface + InMemoryObjectStorage"]
+        S3Storage["s3-object-storage.ts\nS3ObjectStorage"]
+        AwsClients["aws-clients.ts\nSDK client factory (LocalStack-aware)"]
+        Types["types.ts\nImportRecord, ChunkMessage, ChunkResult, CustomerRecord"]
+
+        DynamoStore -.implements.-> Repository
+        S3Storage -.implements.-> ObjectStorage
+        Dependencies --> Config
+        Dependencies --> Logger
+        Dependencies --> Repository
+        Dependencies --> ObjectStorage
+        Dependencies --> AwsClients
+        Dependencies --> DynamoStore
+        Dependencies --> S3Storage
+    end
+
+    UploadEntry --> Dependencies
+    UploadEntry --> Metrics
+    UploadHandler --> Validation
+    UploadHandler --> Events
+    UploadHandler --> Http
+    UploadHandler --> Errors
+    UploadHandler --> Types
+
+    SplitEntry --> Dependencies
+    SplitEntry --> Metrics
+    SplitHandler --> Csv
+    SplitHandler --> Errors
+    SplitHandler --> Types
+
+    WorkerEntry --> Dependencies
+    WorkerEntry --> Metrics
+    WorkerHandler --> Csv
+    WorkerHandler --> Validation
+    WorkerHandler --> Events
+    WorkerHandler --> Errors
+    WorkerHandler --> Types
+
+    AggregatorEntry --> Dependencies
+    AggregatorEntry --> Metrics
+    AggregatorHandler --> Errors
+    AggregatorHandler --> Types
+
+    StatusEntry --> Dependencies
+    StatusEntry --> Metrics
+    StatusHandler --> Http
+    StatusHandler --> Errors

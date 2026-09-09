@@ -1,0 +1,26 @@
+%% Business flow — ImportRecord.status lifecycle
+%% Only states actually assigned in code are wired below.
+%% ImportStatus also declares PROCESSING and CANCELLED, but nothing in
+%% lambdas/* or shared/* ever sets them today — no transition to/from them exists.
+stateDiagram-v2
+    [*] --> UPLOADED: Upload Lambda saves the record
+
+    UPLOADED --> SPLITTING: Split Lambda starts (EventBridge-invoked)
+    SPLITTING --> QUEUED: chunks produced, one SQS message each
+    SPLITTING --> FAILED: CSV produced zero chunks
+
+    QUEUED --> RUNNING: first Worker processes a chunk
+
+    RUNNING --> COMPLETED: Aggregator, all chunks in, failedRecords == 0
+    RUNNING --> PARTIAL_SUCCESS: Aggregator, all chunks in, some rows failed validation
+    RUNNING --> FAILED: Aggregator, all chunks in, every row failed validation
+
+    COMPLETED --> [*]
+    PARTIAL_SUCCESS --> [*]
+    FAILED --> [*]
+
+    note right of RUNNING
+        Aggregator only finalizes once
+        listChunkResults().length == totalChunks;
+        an early or replayed invocation is a no-op.
+    end note

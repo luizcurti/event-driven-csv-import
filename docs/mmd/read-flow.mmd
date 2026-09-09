@@ -1,0 +1,27 @@
+%% Read path — import status lookup
+sequenceDiagram
+    autonumber
+    actor User
+    participant APIGW as API Gateway
+    participant Status as Status Lambda
+    participant DDB as DynamoDB (imports table)
+
+    alt GET /imports/{id}
+        User->>APIGW: GET /imports/{id}
+        APIGW->>Status: invoke(pathParameters.id)
+        Status->>DDB: getImport(id)
+        alt found
+            DDB-->>Status: ImportRecord
+            Status-->>APIGW: 200 ImportRecord
+        else not found
+            Status-->>APIGW: 404 ImportNotFoundException
+        end
+        APIGW-->>User: response
+    else GET /imports
+        User->>APIGW: GET /imports
+        APIGW->>Status: invoke(no path parameter)
+        Status->>DDB: listImports() [paginated Scan, entityType=IMPORT]
+        DDB-->>Status: ImportRecord[]
+        Status-->>APIGW: 200 { items: ImportRecord[] }
+        APIGW-->>User: response
+    end

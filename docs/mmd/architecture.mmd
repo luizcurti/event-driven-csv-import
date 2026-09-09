@@ -1,0 +1,49 @@
+%% System architecture — event-driven CSV import pipeline
+%% Source of truth for docs/img/architecture.svg (render with mermaid-cli).
+flowchart TB
+    Users((Users))
+
+    subgraph Edge["Edge"]
+        WAF["AWS WAF\nrate limiting"]
+        APIGW["Amazon API Gateway\nPOST /imports, GET /imports, GET /imports/{id}\nthrottling, access logs, X-Ray"]
+    end
+
+    subgraph API["API Lambdas"]
+        Upload["Upload Lambda\nvalidates file, writes S3 + DynamoDB"]
+        Status["Status Lambda\nreads DynamoDB"]
+    end
+
+    S3["Amazon S3\nimports bucket\nincoming/{importId}/... , processing/{importId}/..."]
+    EventBridge["Amazon EventBridge\ndefault bus\nrule: Object Created, key prefix incoming/"]
+    Split["Split Lambda\nchunks CSV, enqueues one message per chunk"]
+    SQS["Amazon SQS\nprocessing queue (+ DLQ, maxReceiveCount 3)"]
+    Worker["Worker Lambda(s)\nconcurrency capped by event source mapping\nvalidates rows, writes chunk results"]
+    Aggregator["Aggregator Lambda\ninvoked directly by the last Worker\nconsolidates status"]
+    AsyncDLQ["Amazon SQS\nasync-failures queue\n(Split's and Aggregator's failed async invokes)"]
+    DynamoDB[("Amazon DynamoDB\nimports table (pk/sk single-table)\npoint-in-time recovery")]
+    CloudWatch["Amazon CloudWatch\nlogs, metrics, alarms, dashboard\n+ AWS X-Ray tracing"]
+
+    Users -->|"POST /imports"| WAF --> APIGW --> Upload
+    Upload -->|"putObject"| S3
+    Upload -->|"saveImport"| DynamoDB
+    S3 -.->|"Object Created event"| EventBridge
+    EventBridge -->|"async Invoke"| Split
+    Split -->|"getObject / putObject chunks"| S3
+    Split -->|"updateImport"| DynamoDB
+    Split -->|"SendMessage x N"| SQS
+    Split -.->|"on repeated invoke failure"| AsyncDLQ
+    SQS -->|"event source mapping\nbatch of chunk messages"| Worker
+    Worker -->|"getObject chunk"| S3
+    Worker -->|"saveChunkResult, updateImport"| DynamoDB
+    Worker -->|"async Invoke\n(only when processedChunks == totalChunks)"| Aggregator
+    Aggregator -->|"updateImport final status"| DynamoDB
+    Aggregator -.->|"on repeated invoke failure"| AsyncDLQ
+
+    Users -->|"GET /imports[/{id}]"| WAF --> APIGW --> Status
+    Status -->|"getImport / listImports"| DynamoDB
+
+    Upload -. metrics/logs .-> CloudWatch
+    Split -. metrics/logs .-> CloudWatch
+    Worker -. metrics/logs .-> CloudWatch
+    Aggregator -. metrics/logs .-> CloudWatch
+    Status -. metrics/logs .-> CloudWatch

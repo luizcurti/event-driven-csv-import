@@ -1,0 +1,60 @@
+%% Write path — CSV upload through aggregation
+sequenceDiagram
+    autonumber
+    actor User
+    participant APIGW as API Gateway
+    participant Upload as Upload Lambda
+    participant S3 as S3 (imports bucket)
+    participant DDB as DynamoDB (imports table)
+    participant EB as EventBridge
+    participant Split as Split Lambda
+    participant SQS as SQS (processing queue)
+    participant Worker as Worker Lambda(s)
+    participant Aggregator as Aggregator Lambda
+
+    User->>APIGW: POST /imports (multipart or JSON envelope)
+    APIGW->>Upload: invoke (proxy event)
+    Upload->>Upload: validateUploadFile (extension, MIME, size)
+    Upload->>DDB: saveImport(status=UPLOADED)
+    Upload->>S3: putObject incoming/{importId}/{filename}
+    Upload-->>APIGW: 201 { importId, status: UPLOADED }
+    APIGW-->>User: 201 Created
+
+    S3--)EB: Object Created (key prefix incoming/)
+    EB->>Split: async Invoke(event)
+    Split->>DDB: getImport(importId)
+    Split->>S3: getObject(source CSV)
+    Split->>Split: splitCsvIntoChunks(chunkSize)
+    Split->>DDB: updateImport(status=SPLITTING, totalChunks, totalRecords)
+    loop for each chunk
+        Split->>S3: putObject processing/{importId}/chunk-NNNN.csv
+        Split->>SQS: SendMessage(ChunkMessage)
+    end
+    Split->>DDB: updateImport(status=QUEUED, or FAILED if 0 chunks)
+    Note right of Split: EventBridge invokes asynchronously, so a Split<br/>failure gets Lambda's built-in async retry, then lands<br/>in the async-failures DLQ if it still doesn't succeed
+
+    par one invocation per SQS batch (up to worker_concurrency)
+        SQS->>Worker: batch of ChunkMessage (batchSize 10)
+        Worker->>S3: getObject(chunk)
+        Worker->>Worker: parseCsvText + validateCustomerRecord (per row)
+        Worker->>DDB: saveChunkResult (upsert by chunkNumber, isNewChunk?)
+        alt isNewChunk
+            Worker->>DDB: incrementProcessedChunks(importId) [atomic ADD]
+        else redelivered chunk
+            Worker->>DDB: listChunkResults(importId) [use existing count]
+        end
+        Worker->>DDB: updateImport(status=RUNNING, running totals)
+        alt processedChunks == totalChunks
+            Worker->>Aggregator: async Invoke({ importId })
+            Note right of Worker: only the Worker that observes the atomic<br/>counter reaching totalChunks invokes it —<br/>guards against a double-trigger race
+        end
+    end
+
+    Aggregator->>DDB: getImport(importId)
+    Aggregator->>DDB: listChunkResults(importId)
+    alt chunkResults.length < totalChunks
+        Note right of Aggregator: aggregation skipped — replay or early<br/>invocation while chunks are still pending
+    else all chunks accounted for
+        Aggregator->>Aggregator: derive COMPLETED / PARTIAL_SUCCESS / FAILED
+        Aggregator->>DDB: updateImport(final status, totals, executionTimeMs)
+    end

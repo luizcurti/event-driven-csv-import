@@ -1,0 +1,63 @@
+%% Domain model — DynamoDB single-table design (imports table: pk/sk, PAY_PER_REQUEST)
+erDiagram
+    IMPORT ||--o{ CHUNK_RESULT : "has many, same pk prefix"
+
+    IMPORT {
+        string partitionKey "table pk, IMPORT plus importId"
+        string sk "table sk, constant META"
+        string entityType "constant IMPORT"
+        string id
+        string correlationId
+        string filename
+        string bucket
+        string key "S3 key of the source CSV"
+        string status "see import-status-lifecycle"
+        string createdAt
+        string updatedAt
+        number totalChunks
+        number processedChunks "atomic ADD counter"
+        number totalRecords
+        number processedRecords
+        number failedRecords
+        number successRecords
+        number executionTimeMs "set by Aggregator"
+        number chunkSize
+    }
+
+    CHUNK_RESULT {
+        string partitionKey "table pk, IMPORT plus importId"
+        string sk "table sk, CHUNK plus zero-padded chunkNumber"
+        string entityType "constant CHUNK_RESULT"
+        string importId
+        number chunkNumber
+        string workerId
+        string requestId
+        string status "COMPLETED, FAILED or PARTIAL_SUCCESS"
+        number recordsProcessed
+        number successRecords
+        number failedRecords
+        string errors "list of invalid customerIds"
+        number durationMs
+        string correlationId
+    }
+
+    CUSTOMER_RECORD {
+        string customerId
+        string name
+        string email
+        string cpf "validated with check-digit algorithm"
+        number age
+        string status "VALID or INVALID, in-flight only, not persisted"
+    }
+
+    CHUNK_MESSAGE {
+        string importId
+        number chunkNumber
+        string bucket
+        string key "S3 key of this chunk CSV"
+        number totalChunks
+        string correlationId
+    }
+
+    CHUNK_RESULT }o--|| CHUNK_MESSAGE : "produced by processing"
+    CHUNK_MESSAGE ||--o{ CUSTOMER_RECORD : "parsed rows"

@@ -1,0 +1,109 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Format check
+        run: npm run format
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (with coverage)
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Terraform fmt
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: npm run terraform:init
+
+      - name: Terraform validate
+        run: npm run terraform:validate
+
+      - name: Setup tflint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.64.0
+
+      - name: Terraform lint (tflint)
+        working-directory: terraform
+        run: tflint --config "${{ github.workspace }}/terraform/.tflint.hcl" --recursive
+
+      - name: Setup Python (for checkov)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Terraform static analysis (checkov)
+        run: |
+          pip install --quiet checkov
+          checkov --config-file .checkov.yaml
+
+      - name: Package Lambdas
+        run: npm run package:lambdas
+
+      - name: Start LocalStack
+        run: |
+          docker run -d --name localstack \
+            -p 4566:4566 \
+            -e SERVICES=s3,dynamodb,sqs,sns,lambda,events,cloudwatch,logs,iam,kms,sts,apigateway \
+            -e AWS_DEFAULT_REGION=us-east-1 \
+            -e AWS_ACCESS_KEY_ID=test \
+            -e AWS_SECRET_ACCESS_KEY=test \
+            -e DEBUG=0 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            localstack/localstack:4.1.1
+
+      - name: Wait for LocalStack
+        run: timeout 60 bash -c 'until curl -sf http://localhost:4566/_localstack/health; do sleep 2; done'
+
+      - name: E2E test (LocalStack)
+        run: npm run test:localstack
+
+      - name: Deploy stack to LocalStack
+        run: npm run terraform:apply -- -var use_localstack=true -auto-approve
+
+      - name: API/collection tests (Postman via Newman)
+        run: npm run test:postman
+
+      - name: Destroy LocalStack stack
+        if: always()
+        run: npm run terraform:destroy -- -var use_localstack=true -auto-approve
+
+      - name: Stop LocalStack
+        if: always()
+        run: docker rm -f localstack

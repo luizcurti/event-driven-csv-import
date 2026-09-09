@@ -1,0 +1,29 @@
+%% Deployment/container architecture — local dev stack (docker-compose.local.yml)
+%% Real AWS deployment uses the same Terraform (terraform/) without the
+%% observability containers below; PUSHGATEWAY_URL is only set when
+%% use_localstack=true, so Lambdas never push metrics against real AWS.
+flowchart TB
+    subgraph Host["Developer machine"]
+        subgraph Net["docker network: event-driven-csv-import-observability"]
+            LocalStack["localstack:4.1.1\nport 4566\nS3, DynamoDB, SQS, EventBridge,\nAPI Gateway, Lambda..."]
+            LambdaContainers["ephemeral per-invocation containers\n(LocalStack Lambda executor,\nvia mounted /var/run/docker.sock)"]
+            Pushgateway["pushgateway:v1.9.0\nport 9091"]
+            Prometheus["prometheus:v2.54.1\nport 9090\nscrapes Pushgateway"]
+            Loki["loki:2.9.8\nport 3100"]
+            Promtail["promtail:2.9.8\nreads container logs via\nmounted docker.sock + /var/lib/docker/containers"]
+            Grafana["grafana:11.2.0\nport 3000 (admin/admin)\nLambda overview dashboard"]
+
+            LocalStack -->|spawns| LambdaContainers
+            LambdaContainers -->|push metrics on each invocation\nwithMetrics wrapper| Pushgateway
+            Prometheus -->|scrape| Pushgateway
+            Promtail -->|ship JSON logs, labeled by scope| Loki
+            Grafana -->|query| Prometheus
+            Grafana -->|query| Loki
+        end
+    end
+
+    Terraform["terraform apply\n-var use_localstack=true"] -->|provisions S3/DynamoDB/SQS/\nEventBridge/API GW/Lambda| LocalStack
+    Newman["npm run test:postman\n(Newman via npx)"] -->|HTTP| LocalStack
+    E2E["npm run test:localstack\n(drives handlers directly)"] -.->|bypasses Terraform,\ncreates its own bucket/table/queue| LocalStack
+
+    style LambdaContainers stroke-dasharray: 5 5

@@ -1,0 +1,227 @@
+{
+  "info": {
+    "_postman_id": "2b7a0fe8-8c65-4d8d-a1c9-7f5d0d0b9f6f",
+    "name": "Event Driven CSV Import API",
+    "description": "Requests that match the implemented Lambda handlers in this repository. `baseUrl` must point at a deployed API Gateway invoke URL (LocalStack via Terraform, or a real AWS deployment) — the handlers are not exposed over HTTP without one.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Imports",
+      "item": [
+        {
+          "name": "Create import",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has importId and UPLOADED status', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.importId).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.status).to.eql('UPLOADED');",
+                  "  pm.collectionVariables.set('importId', body.importId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-correlation-id", "value": "{{correlationId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"customers.csv\",\n  \"contentType\": \"text/csv\",\n  \"body\": \"customerId,name,email,cpf,age\\n1,Alice,alice@example.com,52998224725,30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/imports",
+              "host": ["{{baseUrl}}"],
+              "path": ["imports"]
+            }
+          }
+        },
+        {
+          "name": "List imports",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has an items array', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.items).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/imports",
+              "host": ["{{baseUrl}}"],
+              "path": ["imports"]
+            }
+          }
+        },
+        {
+          "name": "Get import by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response matches the requested import', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.id).to.eql(pm.collectionVariables.get('importId'));",
+                  "  pm.expect(body.status).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/imports/{{importId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["imports", "{{importId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Imports - error scenarios",
+      "item": [
+        {
+          "name": "Create import - invalid file extension",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response reports INVALID_FILE', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql('INVALID_FILE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"customers.txt\",\n  \"contentType\": \"text/csv\",\n  \"body\": \"customerId,name,email,cpf,age\\n1,Alice,alice@example.com,52998224725,30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/imports",
+              "host": ["{{baseUrl}}"],
+              "path": ["imports"]
+            }
+          },
+          "description": "fileName does not end in .csv, so validateUploadFile rejects it before anything is persisted."
+        },
+        {
+          "name": "Create import - malformed payload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response reports VALIDATION_ERROR', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"customers.csv\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/imports",
+              "host": ["{{baseUrl}}"],
+              "path": ["imports"]
+            }
+          },
+          "description": "Missing contentType/body fields, so the JSON envelope fails parseUploadInput's shape check."
+        },
+        {
+          "name": "Get import by id - not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Response reports IMPORT_NOT_FOUND', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql('IMPORT_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/imports/{{nonExistentImportId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["imports", "{{nonExistentImportId}}"]
+            }
+          },
+          "description": "A random id that was never uploaded, so the status handler throws ImportNotFoundException."
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "importId", "value": "" },
+    { "key": "correlationId", "value": "00000000-0000-0000-0000-000000000000" },
+    {
+      "key": "nonExistentImportId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    }
+  ]
+}
