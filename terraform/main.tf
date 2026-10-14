@@ -15,11 +15,34 @@ locals {
   # so the queue's visibility timeout below can never silently drift out of
   # sync with the Worker Lambda's actual timeout again.
   worker_timeout_seconds = 120
+
+  # S3 bucket names are global, so the default is suffixed with the account ID to stay
+  # unique; set imports_bucket_name to override it.
+  imports_bucket_name = coalesce(var.imports_bucket_name, "${local.name_prefix}-imports-${data.aws_caller_identity.current.account_id}")
+
+  # nodejs20.x is deprecated on AWS Lambda; LocalStack (4.1.1 in CI) keeps it.
+  lambda_runtime = var.use_localstack ? "nodejs20.x" : "nodejs22.x"
+
+  # "local" keeps the LocalStack URLs unchanged; real AWS gets /<environment>.
+  api_stage_name = var.use_localstack ? "local" : var.environment
+
+  # New AWS accounts have a 10-execution concurrency limit and must keep 10 unreserved,
+  # so nothing can be reserved there: reserve_lambda_concurrency = false leaves every
+  # function unreserved (the CI/CD deploy job's default).
+  reserved_concurrency = {
+    upload     = var.reserve_lambda_concurrency ? var.upload_reserved_concurrency : null
+    split      = var.reserve_lambda_concurrency ? var.split_reserved_concurrency : null
+    worker     = var.reserve_lambda_concurrency ? var.worker_concurrency : null
+    aggregator = var.reserve_lambda_concurrency ? var.aggregator_reserved_concurrency : null
+    status     = var.reserve_lambda_concurrency ? var.status_reserved_concurrency : null
+  }
 }
+
+data "aws_caller_identity" "current" {}
 
 module "s3" {
   source      = "./modules/s3"
-  bucket_name = var.imports_bucket_name
+  bucket_name = local.imports_bucket_name
 }
 
 module "dynamodb" {
@@ -59,11 +82,11 @@ module "lambda_upload" {
   source                         = "./modules/lambda"
   name                           = local.upload_function_name
   handler                        = "lambdas/upload/entry.handler"
-  runtime                        = "nodejs20.x"
+  runtime                        = local.lambda_runtime
   timeout                        = 30
   zip_path                       = var.lambda_zip_path
   role_arn                       = module.iam.lambda_execution_role_arn
-  reserved_concurrent_executions = var.upload_reserved_concurrency
+  reserved_concurrent_executions = local.reserved_concurrency.upload
   environment = {
     IMPORTS_BUCKET     = module.s3.bucket_name
     IMPORTS_TABLE_NAME = module.dynamodb.table_name
@@ -76,11 +99,11 @@ module "lambda_split" {
   source                         = "./modules/lambda"
   name                           = local.split_function_name
   handler                        = "lambdas/split/entry.handler"
-  runtime                        = "nodejs20.x"
+  runtime                        = local.lambda_runtime
   timeout                        = 60
   zip_path                       = var.lambda_zip_path
   role_arn                       = module.iam.lambda_execution_role_arn
-  reserved_concurrent_executions = var.split_reserved_concurrency
+  reserved_concurrent_executions = local.reserved_concurrency.split
   dead_letter_target_arn         = aws_sqs_queue.async_failures.arn
   environment = {
     IMPORTS_BUCKET       = module.s3.bucket_name
@@ -95,11 +118,11 @@ module "lambda_worker" {
   source                         = "./modules/lambda"
   name                           = local.worker_function_name
   handler                        = "lambdas/worker/entry.handler"
-  runtime                        = "nodejs20.x"
+  runtime                        = local.lambda_runtime
   timeout                        = local.worker_timeout_seconds
   zip_path                       = var.lambda_zip_path
   role_arn                       = module.iam.worker_execution_role_arn
-  reserved_concurrent_executions = var.worker_concurrency
+  reserved_concurrent_executions = local.reserved_concurrency.worker
   environment = {
     IMPORTS_BUCKET           = module.s3.bucket_name
     IMPORTS_TABLE_NAME       = module.dynamodb.table_name
@@ -113,11 +136,11 @@ module "lambda_aggregator" {
   source                         = "./modules/lambda"
   name                           = local.aggregator_function_name
   handler                        = "lambdas/aggregator/entry.handler"
-  runtime                        = "nodejs20.x"
+  runtime                        = local.lambda_runtime
   timeout                        = 30
   zip_path                       = var.lambda_zip_path
   role_arn                       = module.iam.aggregator_execution_role_arn
-  reserved_concurrent_executions = var.aggregator_reserved_concurrency
+  reserved_concurrent_executions = local.reserved_concurrency.aggregator
   dead_letter_target_arn         = aws_sqs_queue.async_failures.arn
   environment = {
     IMPORTS_BUCKET     = module.s3.bucket_name
@@ -130,11 +153,11 @@ module "lambda_status" {
   source                         = "./modules/lambda"
   name                           = local.status_function_name
   handler                        = "lambdas/status/entry.handler"
-  runtime                        = "nodejs20.x"
+  runtime                        = local.lambda_runtime
   timeout                        = 30
   zip_path                       = var.lambda_zip_path
   role_arn                       = module.iam.status_execution_role_arn
-  reserved_concurrent_executions = var.status_reserved_concurrency
+  reserved_concurrent_executions = local.reserved_concurrency.status
   environment = {
     IMPORTS_BUCKET     = module.s3.bucket_name
     IMPORTS_TABLE_NAME = module.dynamodb.table_name
@@ -162,6 +185,7 @@ module "apigateway" {
   source = "./modules/apigateway"
 
   api_name                = "${local.name_prefix}-api"
+  stage_name              = local.api_stage_name
   upload_function_name    = module.lambda_upload.function_name
   upload_invoke_arn       = module.lambda_upload.invoke_arn
   status_function_name    = module.lambda_status.function_name

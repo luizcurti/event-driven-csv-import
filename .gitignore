@@ -11,3 +11,12 @@ terraform/crash.log
 terraform/build
 terraform/tfplan.out
 terraform/*.tfplan
+# CI/CD deploy writes these next to the stack (see .github/workflows/ci-cd.yml)
+terraform/ci_backend.tf
+terraform/tfplan
+terraform/*.log
+
+# bootstrap/ keeps its own local state (it creates the remote-state bucket)
+bootstrap/.terraform
+bootstrap/*.tfstate
+bootstrap/*.tfstate.*

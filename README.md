@@ -18,6 +18,7 @@ The system simulates an asynchronous ingestion pipeline with upload, split, para
 - `shared`: types, validations, in-memory storage, structured logging, and metrics
 - `tests`: unit and end-to-end coverage
 - `terraform`: infrastructure as code
+- `bootstrap`: one-time AWS setup for the CI/CD deploy (remote-state bucket, GitHub OIDC deploy role)
 - `scripts`: shell helpers for Docker, Terraform, and API-collection workflows
 - `postman`: API collection for the implemented routes, including error-path examples
 - `local`: config for the local observability stack (Prometheus, Grafana, Loki, Promtail)
@@ -57,18 +58,40 @@ The Terraform helpers are:
 
 `npm run test:localstack` exercises the flow by calling the handlers directly (creating its own bucket/table/queue on the fly) and doesn't need `terraform:apply` first. A `terraform:apply`'d stack is a real, independently-running deployment — the EventBridge → Split → SQS → Worker → Aggregator chain fires on its own once the Upload Lambda is invoked, with no test code driving it.
 
-### AWS deployment
+## Deploy to AWS (GitHub Actions)
 
-The `deploy-aws` GitHub Actions workflow deploys the `dev` environment after a push to `main`, or manually with `workflow_dispatch` on `main`. It runs application verification, packages the Lambdas, then plans and applies Terraform. The job uses GitHub OIDC to assume an AWS role and the `aws-dev` GitHub Environment as an approval boundary; configure required reviewers and restrict deployments to `main` on that environment before enabling real deployments.
+Pushes to `main` deploy to real AWS through the `deploy` job in [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml), after `validate` and `e2e-localstack` pass. It authenticates with GitHub OIDC, so no AWS access keys are stored in GitHub. Until it is configured, the job skips the AWS steps and stays green.
 
-Prepare these AWS and GitHub settings before the first deployment:
+No `backend` block is committed (see [terraform/versions.tf](terraform/versions.tf)): local runs and the LocalStack job use local state, and the deploy job writes a `ci_backend.tf` with an S3 backend right before `terraform init`, using the bucket created by [bootstrap/](bootstrap/) with native S3 locking (`use_lockfile`, no DynamoDB table). Once the pipeline owns the real AWS stack, don't also `apply` it manually with local state: the two states would diverge.
 
-1. Create an S3 bucket for Terraform state outside this stack. Enable bucket versioning and block public access; the workflow enables server-side encryption and S3-native state locking. The deployment role needs access to this bucket's state object and lock file.
-2. Create an AWS IAM OIDC provider for `token.actions.githubusercontent.com` and a role trusted only for this repository's `aws-dev` environment (`repo:<OWNER>/<REPOSITORY>:environment:aws-dev`). Grant the role the AWS permissions required by the resources in `terraform/`.
-3. Create the GitHub Environment named `aws-dev`, require reviewers, and restrict its deployment branches to `main`. Add the `AWS_DEPLOY_ROLE_ARN` environment secret and the `AWS_REGION` and `TF_STATE_BUCKET` environment variables.
-4. Ensure the target AWS account and region are ready for the stack. In particular, the default S3 imports bucket name must be globally unique; override `imports_bucket_name` in Terraform if it is already taken.
+One-time setup:
 
-Terraform declares an S3 backend. The `npm run terraform:init` helper disables remote backends by default so local development and LocalStack continue to use local state; when passed `-backend-config` options, it initializes the configured remote backend instead. The AWS workflow supplies the remote bucket, region, a stable state key, and native S3 locking. If the stack already exists in AWS with local state, migrate that state to the configured backend before enabling automated applies; do not let the workflow initialize an empty state against resources already managed elsewhere.
+1. Apply [bootstrap/](bootstrap/) with your own admin credentials. It creates the remote-state bucket and the `event-driven-data-ingestion-github-deploy` IAM role, which only the `production` environment of this repo can assume:
+
+   ```bash
+   cd bootstrap
+   terraform init
+   terraform apply   # default region: eu-west-2; override with -var="aws_region=..."
+   # add -var="create_oidc_provider=true" on an account that doesn't have the GitHub OIDC provider yet
+   ```
+
+   An AWS account can only have one `token.actions.githubusercontent.com` OIDC provider, so `create_oidc_provider` defaults to `false`, reusing the one another project's bootstrap already created in the same account.
+
+2. In GitHub → Settings → Environments, create `production` and add:
+   - variables `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET` and `AWS_REGION`, copied from the bootstrap outputs
+   - optional variable `RESERVE_LAMBDA_CONCURRENCY` (default `false`). New AWS accounts have a 10-execution concurrency limit, which leaves nothing to reserve; raise the _Lambda → Concurrent executions_ quota in Service Quotas first, then set it to `true` to apply the `*_reserved_concurrency` values
+   - optional variable `MANAGE_API_GATEWAY_ACCOUNT_SETTINGS` (default `true`). The API Gateway CloudWatch Logs role is one setting per account and region; set `false` if another stack in the same account/region already manages it
+   - optional protection rules (required reviewers) to approve each deploy by hand
+
+3. Push to `main` (or run **Actions → CI-CD → Run workflow** on `main`). The job packages the Lambdas, runs `terraform plan` + `apply`, then smoke-tests the live API: `GET /imports` must return `200` and `GET /imports/{unknown id}` `404`. The API URL (`https://<id>.execute-api.<region>.amazonaws.com/dev`) is printed in the job summary.
+
+The imports bucket is named `<project>-<environment>-imports-<account id>` so it is globally unique; set `imports_bucket_name` to override it. Lambdas run on `nodejs22.x` on AWS (`nodejs20.x` is deprecated there) and on `nodejs20.x` in LocalStack.
+
+### Tear down / recreate
+
+To stop paying for the stack while it's unused (mainly the WAF web ACL, a fixed monthly cost), run **Actions → Destroy → Run workflow** on `main` and type `destroy` to confirm. It runs `terraform destroy` against the same S3 state, deleting every resource in [terraform/](terraform/), S3 imports and DynamoDB data included. The [bootstrap/](bootstrap/) resources (state bucket, OIDC provider, deploy role) are kept, so recreating it needs no setup: run **Actions → CI-CD → Run workflow** on `main` (any push to `main` also redeploys).
+
+The deploy role's permissions ([bootstrap/deploy_permissions.tf](bootstrap/deploy_permissions.tf)) are scoped to resources named with the `event-driven-data-ingestion-` prefix wherever AWS supports it. It can only attach the three AWS-managed policies the stack uses to roles it creates, and can't modify itself.
 
 ## Observability (local)
 
@@ -89,7 +112,7 @@ On top of the local stack above, a real AWS deployment gets:
 - **CloudWatch Alarms** (`terraform/modules/alarms`) — Errors, Throttles, and near-timeout Duration per Lambda; 4XX/5XX on the API Gateway stage; a queue-depth alarm on the async-failures DLQ (see "Why there's no Step Functions" below). Skipped when `use_localstack = true`, same as the existing dashboard.
 - **X-Ray** — active tracing on every Lambda and the API Gateway stage, so a request that crosses Upload → EventBridge → Split → SQS → Worker → Aggregator can be followed as one trace.
 - **Dead-letter queues** — a shared SQS queue catches failed _asynchronous_ Lambda invocations (`dead_letter_config`): Split's (EventBridge invokes it async) and the Aggregator's (the Worker invokes it async). This is separate from the SQS processing queue's own DLQ (Worker message failures), which is backed by that queue's redrive policy instead.
-- **Reserved concurrency** — every Lambda has a `reserved_concurrent_executions` cap (see the `*_reserved_concurrency` variables in `terraform/variables.tf`), so a runaway function can't starve the account's shared concurrency pool.
+- **Reserved concurrency** — every Lambda can get a `reserved_concurrent_executions` cap (the `*_reserved_concurrency` variables in `terraform/variables.tf`, switched on by `reserve_lambda_concurrency`), so a runaway function can't starve the account's shared concurrency pool. The CI/CD deploy leaves it off by default, since new accounts have no concurrency to reserve (see [Deploy to AWS](#deploy-to-aws-github-actions)).
 - **API Gateway throttling & access logs** — stage-wide rate/burst limits (`aws_api_gateway_method_settings`) and structured JSON access logs to their own log group.
 - **IAM least privilege** — Aggregator and Status each get their own role scoped to what they actually call (Aggregator: DynamoDB only, no S3/SQS; Status: read-only DynamoDB). Upload and Split still share a role since their access needs genuinely overlap.
 - **Lambda versioning/aliases** — every function publishes a version on each deploy and gets a `live` alias, so the infrastructure for gradual rollout/rollback exists. Current callers (API Gateway, EventBridge, the Worker's Aggregator invoke, the SQS event source mapping) still target `$LATEST` directly — pointing them at the alias instead, with weighted traffic shifting, is a deliberate follow-up rather than something this change silently switched on.
@@ -131,7 +154,9 @@ Diagrams are authored as Mermaid sources in [`docs/mmd`](docs/mmd) and rendered 
 
 ## Verification
 
-CI (`.github/workflows/ci.yml`) runs on every push and pull request, in order:
+CI/CD (`.github/workflows/ci-cd.yml`) runs on every push and pull request to `main`, in three jobs.
+
+**validate**:
 
 1. Dependency audit (`npm audit --audit-level=high`)
 2. Prettier formatting check (`npm run format`)
@@ -139,17 +164,20 @@ CI (`.github/workflows/ci.yml`) runs on every push and pull request, in order:
 4. Typecheck (`npm run typecheck`)
 5. Unit tests with 100% coverage enforcement (`npm run test:coverage`)
 6. Build (`npm run build`)
-7. Terraform formatting check (`terraform fmt -check -recursive`)
-8. Terraform init and validate (`npm run terraform:init` / `terraform:validate`) — no credentials needed, both work against the plain provider config
+7. Terraform formatting check (`terraform fmt -check -recursive`) for `terraform/` and `bootstrap/`
+8. Terraform init and validate for `terraform/` and `bootstrap/` (`-backend=false`, no credentials needed)
 9. Terraform lint (`tflint --recursive`, config in `terraform/.tflint.hcl`)
 10. Terraform static analysis (`checkov --config-file .checkov.yaml`) — findings that don't apply to this project's scale (e.g. Lambda-in-a-VPC, DynamoDB with a customer-managed KMS key) are explicitly skipped in that config file, each with a one-line reason, rather than silenced globally
-11. Package the Lambdas (`npm run package:lambdas`)
-12. Start LocalStack (with `/var/run/docker.sock` mounted) and wait for it to report healthy
-13. LocalStack end-to-end test (`npm run test:localstack`) — drives the handlers directly
-14. Deploy the full stack into LocalStack (`npm run terraform:apply -- -var use_localstack=true -auto-approve`)
-15. API/collection tests against the deployed stack (`npm run test:postman`)
-16. Tear down: `terraform:destroy` then stop the LocalStack container (both run unconditionally, even if an earlier step failed)
 
-Terraform `plan` (`npm run terraform:plan`) isn't run in CI — it's a diff against a specific target environment/state and is meant for interactive use before an `apply`, not a stateless CI check.
+**e2e-localstack** (after validate):
 
-The AWS deployment workflow is separate from LocalStack CI. It runs only from `main` or a manual dispatch, and the `aws-dev` GitHub Environment can require approval before any AWS credentials are issued.
+1. Package the Lambdas (`npm run package:lambdas`)
+2. Start LocalStack (with `/var/run/docker.sock` mounted) and wait for it to report healthy
+3. LocalStack end-to-end test (`npm run test:localstack`) — drives the handlers directly
+4. Deploy the full stack into LocalStack (`npm run terraform:apply -- -var use_localstack=true -auto-approve`)
+5. API/collection tests against the deployed stack (`npm run test:postman`)
+6. Tear down: `terraform:destroy` then stop the LocalStack container (both run unconditionally, even if an earlier step failed)
+
+**deploy** (push or manual run on `main`, after both): assumes the deploy IAM role via GitHub OIDC in the `production` environment, runs `terraform plan` + `apply` against real AWS with S3 remote state, and smoke-tests the live API. Terraform errors are surfaced as run annotations. See [Deploy to AWS (GitHub Actions)](#deploy-to-aws-github-actions).
+
+The **Destroy** workflow (`.github/workflows/destroy.yml`, manual only) tears the AWS stack down — see [Tear down / recreate](#tear-down--recreate).
