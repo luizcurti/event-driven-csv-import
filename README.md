@@ -57,15 +57,18 @@ The Terraform helpers are:
 
 `npm run test:localstack` exercises the flow by calling the handlers directly (creating its own bucket/table/queue on the fly) and doesn't need `terraform:apply` first. A `terraform:apply`'d stack is a real, independently-running deployment — the EventBridge → Split → SQS → Worker → Aggregator chain fires on its own once the Upload Lambda is invoked, with no test code driving it.
 
-### Terraform state
+### AWS deployment
 
-There is no `backend` block configured (see `terraform/versions.tf`), so Terraform uses its default **local** backend: state lives in `terraform/terraform.tfstate` on disk (gitignored) and there is no locking. That's a deliberate fit for this project's current shape — a single-contributor stack, applied by hand or by CI only against LocalStack — not an oversight to silently work around.
+The `deploy-aws` GitHub Actions workflow deploys the `dev` environment after a push to `main`, or manually with `workflow_dispatch` on `main`. It runs application verification, packages the Lambdas, then plans and applies Terraform. The job uses GitHub OIDC to assume an AWS role and the `aws-dev` GitHub Environment as an approval boundary; configure required reviewers and restrict deployments to `main` on that environment before enabling real deployments.
 
-Before more than one person or pipeline can safely run `terraform apply` against a real AWS account, add an S3 (or the newer S3-native-locking) backend:
+Prepare these AWS and GitHub settings before the first deployment:
 
-1. Create the state bucket and, if not using S3 native locking, a DynamoDB lock table (`LockID` as the partition key) — by hand, via the AWS CLI, or with a tiny separate bootstrap Terraform config, since the backend's own storage can't be created by the configuration it backs.
-2. Add a `backend "s3" { ... }` block to `terraform/versions.tf` pointing at that bucket/table.
-3. Run `terraform init -migrate-state` once to move the existing local state into it.
+1. Create an S3 bucket for Terraform state outside this stack. Enable bucket versioning and block public access; the workflow enables server-side encryption and S3-native state locking. The deployment role needs access to this bucket's state object and lock file.
+2. Create an AWS IAM OIDC provider for `token.actions.githubusercontent.com` and a role trusted only for this repository's `aws-dev` environment (`repo:<OWNER>/<REPOSITORY>:environment:aws-dev`). Grant the role the AWS permissions required by the resources in `terraform/`.
+3. Create the GitHub Environment named `aws-dev`, require reviewers, and restrict its deployment branches to `main`. Add the `AWS_DEPLOY_ROLE_ARN` environment secret and the `AWS_REGION` and `TF_STATE_BUCKET` environment variables.
+4. Ensure the target AWS account and region are ready for the stack. In particular, the default S3 imports bucket name must be globally unique; override `imports_bucket_name` in Terraform if it is already taken.
+
+Terraform declares an S3 backend. The `npm run terraform:init` helper disables remote backends by default so local development and LocalStack continue to use local state; when passed `-backend-config` options, it initializes the configured remote backend instead. The AWS workflow supplies the remote bucket, region, a stable state key, and native S3 locking. If the stack already exists in AWS with local state, migrate that state to the configured backend before enabling automated applies; do not let the workflow initialize an empty state against resources already managed elsewhere.
 
 ## Observability (local)
 
@@ -149,4 +152,4 @@ CI (`.github/workflows/ci.yml`) runs on every push and pull request, in order:
 
 Terraform `plan` (`npm run terraform:plan`) isn't run in CI — it's a diff against a specific target environment/state and is meant for interactive use before an `apply`, not a stateless CI check.
 
-There is also no CI job that runs `terraform plan`/`apply` against real AWS, and none was added by this review — that's an intentional portfolio-project decision, not a gap to silently patch over. Standing up that pipeline means provisioning long-lived AWS credentials or an OIDC trust relationship in someone's real AWS account, which is a one-time decision for whoever owns that account, not something to wire up unilaterally during a code review. If this project ever needs it, the standard shape is: a `plan` job that runs on every PR (assuming an OIDC role via `aws-actions/configure-aws-credentials`, least-privilege, read-only) and posts the diff as a PR comment, and a separate `apply` job gated behind a [GitHub Environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) with required reviewers, restricted to the protected branch — so a merge to `main` is what triggers a real deployment, and every apply has a human approval in front of it.
+The AWS deployment workflow is separate from LocalStack CI. It runs only from `main` or a manual dispatch, and the `aws-dev` GitHub Environment can require approval before any AWS credentials are issued.
