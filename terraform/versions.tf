@@ -1,7 +1,11 @@
 terraform {
+  # 1.10+ for the S3 backend's native lockfile (use_lockfile), used by the CI/CD deploy job.
   required_version = ">= 1.10.0"
 
-  backend "s3" {}
+  # No backend block on purpose: local development and the LocalStack CI job use local
+  # state. The CI/CD deploy and Destroy workflows write a ci_backend.tf with
+  # `backend "s3" {}` right before `terraform init`, pointing at the bucket created by
+  # ../bootstrap. Committing the block here would break the LocalStack apply.
 
   required_providers {
     aws = {

@@ -201,6 +201,12 @@ describe('adapter coverage', () => {
       contentType: 'text/csv',
       metadata: { importId: 'import-1' },
     });
+    await storage.putObject({
+      bucket: 'bucket-a',
+      key: 'incoming/no-metadata.csv',
+      body: 'csv',
+      contentType: 'text/csv',
+    });
     expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
     expect(await storage.getObject('bucket-a', 'string.csv')).toMatchObject({
       body: 'string-body',
@@ -486,7 +492,7 @@ describe('adapter coverage', () => {
   });
 
   it('defaults incrementProcessedChunks to 0 when DynamoDB returns no attributes', async () => {
-    const send = jest.fn(async () => ({}));
+    const send = jest.fn(async (_command: unknown) => ({}));
     const store = new DynamoDbImportStore({ send } as never, 'imports-table');
     expect(await store.incrementProcessedChunks('import-1')).toBe(0);
   });

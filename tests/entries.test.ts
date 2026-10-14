@@ -161,7 +161,7 @@ describe('lambda entry adapters', () => {
     });
     await dependencies.store.saveImport(baseImport({ chunkSize: 1 }));
 
-    const send = jest.fn(async () => ({}));
+    const send = jest.fn(async (_command: unknown) => ({}));
     const handler = createSplitEntryHandler(
       dependencies,
       { send } as never,
@@ -185,7 +185,7 @@ describe('lambda entry adapters', () => {
     });
     await dependencies.store.saveImport(baseImport());
 
-    const send = jest.fn(async () => ({}));
+    const send = jest.fn(async (_command: unknown) => ({}));
     const handler = createSplitEntryHandler(
       dependencies,
       { send } as never,
@@ -235,7 +235,7 @@ describe('lambda entry adapters', () => {
       correlationId: 'correlation-1',
     };
 
-    const send = jest.fn(async () => ({}));
+    const send = jest.fn(async (_command: unknown) => ({}));
     const handler = createWorkerEntryHandler(
       dependencies,
       { send } as never,
@@ -272,7 +272,7 @@ describe('lambda entry adapters', () => {
       correlationId: 'correlation-1',
     };
 
-    const send = jest.fn(async () => ({}));
+    const send = jest.fn(async (_command: unknown) => ({}));
     const handler = createWorkerEntryHandler(
       dependencies,
       { send } as never,
@@ -305,7 +305,7 @@ describe('lambda entry adapters', () => {
       correlationId: 'correlation-1',
     };
 
-    const send = jest.fn(async () => ({}));
+    const send = jest.fn(async (_command: unknown) => ({}));
     const handler = createWorkerEntryHandler(
       dependencies,
       { send } as never,

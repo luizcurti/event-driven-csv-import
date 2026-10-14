@@ -18,8 +18,8 @@ variable "aws_region" {
 
 variable "imports_bucket_name" {
   type        = string
-  description = "Name of the S3 bucket used to store imports."
-  default     = "event-driven-data-ingestion-imports"
+  description = "Name of the S3 bucket used to store imports. null (the default) derives a globally unique name: <project>-<environment>-imports-<account id>."
+  default     = null
 }
 
 variable "chunk_size" {
@@ -103,4 +103,10 @@ variable "api_throttling_burst_limit" {
   type        = number
   description = "Burst request limit (concurrent requests) applied to all API Gateway methods."
   default     = 100
+}
+
+variable "reserve_lambda_concurrency" {
+  type        = bool
+  description = "Whether to apply the *_reserved_concurrency values (and worker_concurrency) as reserved concurrent executions. Set false on accounts with the default 10-execution concurrency quota, where AWS doesn't allow reserving any."
+  default     = true
 }
